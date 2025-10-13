@@ -1,0 +1,39 @@
+// search :
+
+searchactualresponse = {
+  token: "875870",
+  symbol: "PFC25NOV330PE",
+  name: "PFC",
+  expiry: "27NOV2025",
+  strike: "33000.000000",
+  lotsize: "1300",
+  instrumenttype: "OPTSTK",
+  exch_seg: "BFO",
+  tick_size: "5.000000",
+};
+
+searchmodifiesdresponse = {
+  name: "GAIL -0.01 EQ ",
+  symbol: "GAIL-EQ",
+  lotsize: "1",
+  token: "4717",
+  strike: -0.01,
+  expiry: "",
+  exchange: "NSE",
+  instrumenttype: "",
+};
+
+//place order:
+
+payload = {
+  tradingsymbol: "GAIL-EQ",
+  symboltoken: "4717",
+  transactiontype: "BUY",
+  exchange: "NSE",
+  ordertype: "LIMIT",
+  producttype: "DELIVERY",
+  variety: "NORMAL",
+  duration: "DAY",
+  price: 2450.5,
+  quantity: 1,
+};

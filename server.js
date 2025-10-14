@@ -1,22 +1,43 @@
-const app = require("./src/app");
+const http = require("http");
 const dotenv = require("dotenv");
-const totp = require("totp-generator")
-const { autoLogin, loginSmartAPI } = require("./src/controllers/authorizationController");
-const { autoSearch } = require("./src/controllers/searchController");
+const app = require("./src/app");
+const { autoLogin } = require("./src/controllers/authorizationController");
+const { startAngelFeed } = require("./src/services/angelFeed");
+const { initSocketServer } = require("./src/services/socketServer");
 
 dotenv.config();
 
 const PORT = process.env.PORT || 5050;
 
-app.listen(PORT, async () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+// Create an HTTP server (Socket.io works with this, not directly with Express)
+const server = http.createServer(app);
 
-  // ✅ Generate your TOTP
-  const code = totp(process.env.ANGEL_ONE_TOTP_SECRET);
-  console.log("Your current TOTP:", code);
+async function startServer() {
+  try {
+    // 1️⃣ Start the HTTP + Express server
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
 
-  // ✅ Auto login when server starts
-  await autoLogin();
+    // 2️⃣ Initialize Socket.io
+    const io = initSocketServer(server);
+    console.log("⚡ Socket.io initialized");
 
+    // 3️⃣ Login to Angel One SmartAPI
+    const loginData = await autoLogin();
+    const tokens = {
+      jwtToken: loginData?.data?.jwtToken,
+      feedToken: loginData?.data?.feedToken
+    };
 
-});
+    // 4️⃣ Start WebSocket feed listener (for LTP + orders)
+    await startAngelFeed(tokens);
+
+    console.log("✅ Angel One WebSocket Feed listening...");
+
+  } catch (err) {
+    console.error("❌ Server initialization failed:", err.message);
+  }
+}
+
+startServer();

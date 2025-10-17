@@ -1,91 +1,138 @@
+// src/services/angelFeed.js
 const { WebSocketV2 } = require("smartapi-javascript");
 const EventEmitter = require("events");
 
 const feedEmitter = new EventEmitter();
-let web_socket = null;
 
-async function startAngelFeed({ jwtToken, feedToken }) {
+let ws = null;
+let isConnected = false;
+let isFeedConnected = false;
+let isSessionActive = false;
+let reconnectTimer = null;
+let listenersAttached = false;
+
+async function initAngelFeed({ jwtToken, feedToken }) {
+  const apiKey = process.env.ANGEL_ONE_API_KEY;
+  const clientCode = process.env.ANGEL_ONE_USERNAME;
+
+  if (!jwtToken || !feedToken)
+    throw new Error("Missing jwtToken or feedToken for feed initialization");
+
+  if (isConnected && ws) {
+    console.log("⚙️ WebSocket already connected, skipping init.");
+    return ws;
+  }
+
   try {
-    const apiKey = process.env.ANGEL_ONE_API_KEY;
-    const clientCode = process.env.ANGEL_ONE_USERNAME;
-
-    if (!jwtToken || !feedToken) {
-      throw new Error("Missing tokens — please login first.");
-    }
-
-    console.log("🔗 Connecting to Angel One WebSocket V2...");
-
-    // ✅ Create WebSocketV2 instance
-    web_socket = new WebSocketV2({
+    ws = new WebSocketV2({
       jwttoken: jwtToken,
       apikey: apiKey,
       clientcode: clientCode,
-      feedtype: feedToken, // Angel One’s V2 feed token (type: 'feedToken')
+      feedtype: feedToken,
     });
 
-    // ✅ Connect to WebSocket server
-    await web_socket.connect();
+    await ws.connect();
+    isConnected = true;
+    isFeedConnected = true;
+    isSessionActive = true;
 
-    console.log("📡 Connected to Angel One WebSocket V2 ✅");
+    console.log("📡 Angel One WebSocket connected ✅");
+    emitFeedStatus();
 
-    // Example subscription request (as per docs)
-    const subReq = {
-      correlationID: "sub_001",
-      action: 1, // 1 = subscribe
-      mode: 1,   // 1 = LTP (or use 2 for Quote, 3 for Depth)
-      exchangeType: 4, // 1 = NSE_CM, 2 = NFO, 3 = CDS,4=BFO, 5 = MCX
-      tokens: ["877897"], // Replace with your symboltoken ------divide by /100
-    }; 
+    // Attach listeners safely
+    attachWebSocketListeners(jwtToken, feedToken);
 
-    // Send subscription
-    web_socket.fetchData(subReq);
-    console.log("📩 Subscribed to:", subReq.tokens);
-
-    // ✅ Handle incoming ticks
-    web_socket.on("tick", (data) => {
-      feedEmitter.emit("tick", data);
-      console.log("💹 Tick:", data);
-    });
-
-    // ✅ Handle errors
-    web_socket.on("error", (err) => {
-      console.error("❌ WebSocket error:", err.message || err);
-    });
-    
-    web_socket.on("close", () => {
-      console.log("🔌 WebSocket closed. Reconnecting in 15s...");
-      setTimeout(() => startAngelFeed({ jwtToken, feedToken }), 15000);
-    });
-
+    return ws;
   } catch (err) {
-    console.error("❌ Failed to connect Angel Feed:", err.message);
+    console.error("❌ Failed to connect Angel One feed:", err.message || err);
+    isFeedConnected = false;
+    emitFeedStatus();
+    scheduleReconnect(jwtToken, feedToken);
   }
 }
 
-function subscribe(token) {
-  if (!web_socket) return console.warn("⚠️ WebSocket not connected.");
-  const msg = {
-    correlationID: `sub_${token}`,
-    action: 1, // subscribe
-    mode: 1, // LTP
-    exchangeType: 2, // NFO
-    tokens: [token],
-  };
-  web_socket.fetchData(msg);
-  console.log("✅ Subscribed dynamically:", token);
+function attachWebSocketListeners(jwtToken, feedToken) {
+  if (!ws || listenersAttached) return;
+  if (typeof ws.on !== "function") {
+    console.warn("⚠️ ws object does not support event listeners");
+    return;
+  }
+
+  ws.on("tick", (data) => feedEmitter.emit("tick", data));
+
+  ws.on("error", (err) => {
+    console.error("❌ Feed error:", err.message || err);
+    isFeedConnected = false;
+    emitFeedStatus();
+  });
+
+  ws.on("close", () => {
+    console.warn("🔌 Feed closed — retrying in 10s...");
+    isConnected = false;
+    isFeedConnected = false;
+    emitFeedStatus();
+    listenersAttached = false;
+    scheduleReconnect(jwtToken, feedToken);
+  });
+
+  listenersAttached = true;
 }
 
-function unsubscribe(token) {
-  if (!web_socket) return console.warn("⚠️ WebSocket not connected.");
-  const msg = {
-    correlationID: `unsub_${token}`,
-    action: 0, // unsubscribe
-    mode: 1,
-    exchangeType: 2,
-    tokens: [token],
-  };
-  web_socket.fetchData(msg);
-  console.log("🛑 Unsubscribed:", token);
+function scheduleReconnect(jwtToken, feedToken, delay = 10000) {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => reconnectFeed({ jwtToken, feedToken }), delay);
 }
 
-module.exports = { startAngelFeed, feedEmitter, subscribe, unsubscribe };
+async function reconnectFeed({ jwtToken, feedToken }) {
+  try {
+    console.log("♻️ Reconnecting to Angel One feed...");
+    await initAngelFeed({ jwtToken, feedToken });
+  } catch (err) {
+    console.error("❌ Reconnection failed:", err.message || err);
+    scheduleReconnect(jwtToken, feedToken, 15000);
+  }
+}
+
+function subscribeTokens(tokens, exchangeType = 2, mode = 1) {
+  if (!ws || !isConnected)
+    return console.warn("⚠️ WebSocket not ready yet. Cannot subscribe.");
+
+  const subReq = {
+    correlationID: `sub_${Date.now()}`,
+    action: 1,
+    mode,
+    exchangeType,
+    tokens: Array.isArray(tokens) ? tokens : [tokens],
+  };
+
+  try {
+    ws.fetchData(subReq);
+    console.log(`✅ Subscribed to ${subReq.tokens.join(", ")} [${exchangeType}]`);
+  } catch (err) {
+    console.error("⚠️ Subscription failed:", err.message || err);
+  }
+}
+
+function emitFeedStatus() {
+  const status = { isFeedConnected, isSessionActive };
+  console.log("🚀 Emitting feedStatus:", status);
+  feedEmitter.emit("feedStatus", status);
+}
+
+function getFeedStatus() {
+  return { isFeedConnected, isSessionActive };
+}
+
+function setSessionStatus(status) {
+  isSessionActive = Boolean(status);
+  console.log(`🔐 Session active: ${isSessionActive}`);
+  emitFeedStatus();
+}
+
+module.exports = {
+  initAngelFeed,
+  subscribeTokens,
+  setSessionStatus,
+  feedEmitter,
+  getFeedStatus,
+};

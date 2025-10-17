@@ -1,42 +1,54 @@
 const http = require("http");
 const dotenv = require("dotenv");
+
 const app = require("./src/app");
-const { autoLogin } = require("./src/controllers/authorizationController");
-const { startAngelFeed } = require("./src/services/angelFeed");
+const {
+  initAngelFeed,
+  subscribeTokens,
+  feedEmitter,
+  setSessionStatus,
+} = require("./src/services/angelFeed");
 const { initSocketServer } = require("./src/services/socketServer");
+const { autoLogin } = require("./src/controllers/authorizationController");
 
 dotenv.config();
 
 const PORT = process.env.PORT || 5050;
-
-// Create an HTTP server (Socket.io works with this, not directly with Express)
 const server = http.createServer(app);
 
 async function startServer() {
   try {
-    // 1️⃣ Start the HTTP + Express server
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+    // 1️⃣ Start Express
+    server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+    // 2️⃣ Initialize Socket.IO *before* login/feed
+    const io = initSocketServer(server);
+    console.log("⚡ Socket.IO initialized");
+
+    // Log feed emitter activity to confirm linkage
+    feedEmitter.on("feedStatus", (status) => {
+      console.log("🛰️ feedEmitter triggered in server.js:", status);
     });
 
-    // 2️⃣ Initialize Socket.io
-    const io = initSocketServer(server);
-    console.log("⚡ Socket.io initialized");
-
-    // 3️⃣ Login to Angel One SmartAPI
+    // 3️⃣ Login to Angel One (auto)
     const loginData = await autoLogin();
-    const tokens = {
-      jwtToken: loginData?.data?.jwtToken,
-      feedToken: loginData?.data?.feedToken
-    };
+    const { jwtToken, feedToken } = loginData?.data || {};
+    if (!jwtToken || !feedToken)
+      throw new Error("Missing SmartAPI tokens");
 
-    // 4️⃣ Start WebSocket feed listener (for LTP + orders)
-    await startAngelFeed(tokens);
+    // 4️⃣ Initialize Angel One WebSocket feed
+    await initAngelFeed({ jwtToken, feedToken });
+    console.log("✅ Angel One WebSocket feed active");
 
-    console.log("✅ Angel One WebSocket Feed listening...");
+    // 5️⃣ Subscribe to a test symbol
+    subscribeTokens("116750", 2);
 
+    // 6️⃣ Listen to feed ticks
+    feedEmitter.on("tick", (tick) => {
+      console.log("📈 Tick received:", tick);
+    });
   } catch (err) {
-    console.error("❌ Server initialization failed:", err.message);
+    console.error("❌ Server failed to start:", err.message || err);
   }
 }
 

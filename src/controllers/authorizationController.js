@@ -1,17 +1,19 @@
-import { SmartAPI } from "smartapi-javascript";
-import totp from "totp-generator";
-import dotenv from "dotenv";
+const { SmartAPI } = require("smartapi-javascript");
+const totp = require("totp-generator");
+const dotenv = require("dotenv");
+const { setSessionStatus } = require("../services/angelFeed");
 
 dotenv.config();
 
 let smartApiInstance = null;
 let sessionData = null;
 
-// 🔹 This version is for Express route (manual call)
-export async function loginSmartAPI(req, res) {
+// 🔹 Express route: manual login
+async function loginSmartAPI(req, res) {
   try {
     const code = totp(process.env.ANGEL_ONE_TOTP_SECRET);
     const smartApi = new SmartAPI({ api_key: process.env.ANGEL_ONE_API_KEY });
+
     const data = await smartApi.generateSession(
       process.env.ANGEL_ONE_USERNAME,
       process.env.ANGEL_ONE_PIN,
@@ -20,20 +22,22 @@ export async function loginSmartAPI(req, res) {
 
     smartApiInstance = smartApi;
     sessionData = data;
+
     res.json({ success: true, data });
   } catch (err) {
-    console.error("Login error:", err);
+    console.error("Login error:", err.message || err);
     res.status(500).json({ success: false, error: err.message || err });
   }
 }
 
-// 🔹 This version is for auto-login (server startup)
-export async function autoLogin() {
+// 🔹 Auto-login: runs at server startup
+async function autoLogin() {
   try {
     const code = totp(process.env.ANGEL_ONE_TOTP_SECRET);
     console.log("🔢 Generated TOTP:", code);
 
     const smartApi = new SmartAPI({ api_key: process.env.ANGEL_ONE_API_KEY });
+
     const data = await smartApi.generateSession(
       process.env.ANGEL_ONE_USERNAME,
       process.env.ANGEL_ONE_PIN,
@@ -43,19 +47,27 @@ export async function autoLogin() {
     smartApiInstance = smartApi;
     sessionData = data;
 
-    // ✅ Await the getProfile() call
-    const profile = await smartApi.getProfile()
 
+    // ✅ Fetch and print profile
+    const profile = await smartApi.getProfile();
     console.log("✅ Angel One login successful!");
     console.log("👤 Profile Data:", profile.data);
-
+    setSessionStatus(true)
     return data;
   } catch (err) {
     console.error("❌ Angel One auto-login failed:", err.message || err);
+    setSessionStatus(false)
   }
 }
 
-export function getSmartApi() {
-  if (!smartApiInstance) throw new Error("Not logged in yet!");
+// 🔹 Getter for SmartAPI instance
+function getSmartApi() {
+  if (!smartApiInstance) throw new Error("❌ SmartAPI not logged in yet!");
   return smartApiInstance;
 }
+
+module.exports = {
+  loginSmartAPI,
+  autoLogin,
+  getSmartApi,
+};

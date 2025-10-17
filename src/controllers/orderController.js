@@ -1,5 +1,7 @@
 const { getSmartApi } = require("./authorizationController");
 
+
+
 exports.placeOrder = async (req, res) => {
   const { tradingsymbol, symboltoken, transactiontype, exchange, ordertype, producttype, price, quantity, variety, duration } = req.body;
 

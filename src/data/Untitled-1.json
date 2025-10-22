@@ -1,0 +1,86 @@
+
+
+{
+    "success": true,
+    "data": {
+        "status": true,
+        "message": "SUCCESS",
+        "errorcode": "",
+        "data": {
+            "script": "GAIL-EQ",
+            "orderid": "1022aef9097cAO",
+            "uniqueorderid": "9eb52af2-32b3-4101-9307-8d29399f659e"
+        }
+    }
+}
+
+//order
+
+{
+    "tradingsymbol": "GAIL-EQ",//o //p
+    "symboltoken": "4717",//o //p
+    "transactiontype": "BUY",//o
+    "exchange": "NSE",//o //p
+    "ordertype": "LIMIT",//o
+    "producttype": "DELIVERY",//o //p
+    "variety": "NORMAL",//o //p
+    "duration": "DAY",//o //p
+    "price": 170.5,//o 
+    "quantity": 1
+}
+
+
+//modify
+{
+    "orderid": "101280dd2ef0AO",//o //p
+    "tradingsymbol": "GAIL-EQ",//o //p
+    "symboltoken": "4717",//o //p
+    "exchange": "NSE",//o //p
+    "ordertype": "LIMIT",//o
+    "producttype": "DELIVERY",//o //p
+    "duration": "DAY",//o //p
+    "price": 2467.5,//o
+    "quantity": 2,//o //p
+    "variety": "NORMAL"//o //p
+}
+
+//tick
+
+{
+    "subscription_mode": "1",
+    "exchange_type": "2",
+    "token": "116750",//p
+    "sequence_number": "28019",
+    "exchange_timestamp":"1761096308775",
+    "last_traded_price": "585"//p
+  }
+
+  //sell
+  {
+    "tradingsymbol": "SENSEX25O1685000CE",
+    "symboltoken": "876189",
+    "exchange": "BFO",
+    "producttype": "INTRADAY",
+    "quantity": 20
+}
+
+
+
+{
+"tradingsymbol": "GAIL-EQ",//o //p
+"orderid": "1022aef9097cAO",// null // id
+"symboltoken": "4717",// id
+"exchange":"BFO",//BFO //NFO //NS //BSE
+"producttype": "DELIVERY",//DELIVERY // INTRADAY
+"variety": "NORMAL",//o //p
+"duration": "DAY",//o //p
+"buy_price": 170.5,//o 
+"quantity": 1,
+"last_traded_price": 172,//p
+"profit_loss":2700,
+"higest_profit":2850,
+"limit_sell_price":174,
+"stop_loss":800, //800 //1500
+"trail":"50%", //50% //75% //cost //800 //1000
+"trade_status":"running" //running/pending/closed/cancelled
+}

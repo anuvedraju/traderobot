@@ -1,3 +1,5 @@
+
+const { addTrade } = require("../data/trades");
 const { getSmartApi } = require("./authorizationController");
 
 
@@ -23,6 +25,20 @@ exports.placeOrder = async (req, res) => {
 
     const response = await smartApi.placeOrder(orderParams);
     res.json({ success: true, data: response });
+    addTrade({
+      tradingsymbol: orderParams.tradingsymbol,
+      symboltoken: orderParams.symboltoken,
+      exchange: orderParams.exchange,
+      orderid: response.data.orderid,
+      producttype: orderParams.producttype,
+      variety: orderParams.variety,
+      duration: orderParams.duration,
+      buy_price: orderParams.price,
+      quantity: orderParams.quantity,
+      stop_loss: 800,
+      trail: "50%",
+      trade_status: "pending",
+    });
   } catch (err) {
     console.error("Order error:", err);
     res.status(500).json({ success: false, error: err.message || err });

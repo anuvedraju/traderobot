@@ -113,6 +113,8 @@ function subscribeTokens(tokens, exchangeType = 2, mode = 1) {
   }
 }
 
+// unsubscribe also needed here
+
 function emitFeedStatus() {
   const status = { isFeedConnected, isSessionActive };
   console.log("🚀 Emitting feedStatus:", status);

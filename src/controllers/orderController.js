@@ -25,6 +25,7 @@ exports.placeOrder = async (req, res) => {
 
     const response = await smartApi.placeOrder(orderParams);
     res.json({ success: true, data: response });
+    console.log("data",response.data)
     addTrade({
       tradingsymbol: orderParams.tradingsymbol,
       symboltoken: orderParams.symboltoken,
@@ -35,7 +36,7 @@ exports.placeOrder = async (req, res) => {
       duration: orderParams.duration,
       buy_price: orderParams.price,
       quantity: orderParams.quantity,
-      stop_loss: 800,
+      stop_loss: 20,
       trail: "50%",
       trade_status: "pending",
     });

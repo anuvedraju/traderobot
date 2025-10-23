@@ -21,6 +21,8 @@
  * @property {Date} [updatedAt] - Last update time
  */
 
+const { subscribeTokens } = require("../services/angelFeed");
+
 let trades = [];
 
 /**
@@ -52,6 +54,11 @@ function addTrade(order) {
   };
 
   trades.push(trade);
+  console.log("tradeadded",trade)
+  const exType = getExchangeType(order.exchange);
+  subscribeTokens(order.symboltoken, 1);
+  
+  
   return trade;
 }
 
@@ -88,6 +95,17 @@ function updatePnL(symbol, ltp) {
     trade.profit_loss = (ltp - trade.buy_price) * trade.quantity;
     trade.updatedAt = new Date();
   }
+}
+
+function getExchangeType(exchange) {
+  const map = {
+    NSE: 1,
+    NFO: 2,
+    BSE: 3,
+    BFO: 4,
+    MCX: 5,
+  };
+  return map[exchange] || 1; // default NSE if unknown
 }
 
 /**

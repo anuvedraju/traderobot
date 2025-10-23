@@ -31,27 +31,27 @@ function initTradeManager() {
     const activeTrades = getActiveTrades();
 
     // Print for debugging (optional)
-    // console.log("📊 Active Trades:", activeTrades);
+    console.log("📊 Active Trades:", activeTrades);
 
     // Run strategy logic for each trade
     activeTrades.forEach((trade) => {
       const loss = trade.profit_loss || 0;
-      const stopLoss = trade.stop_loss || 0;
+      const stopLoss = trade.stop_loss || 800;
 
       // 1️⃣ Stop-loss condition
       if (Math.abs(loss) >= stopLoss && trade.trade_status !== "closed") {
         console.log(`🚨 ${trade.tradingsymbol} loss ₹${loss} > SL ₹${stopLoss}, selling...`);
 
         // Close position (mock)
-        placeOrder({
-          tradingsymbol: trade.tradingsymbol,
-          symboltoken: trade.symboltoken,
-          exchange: trade.exchange,
-          type: "SELL",
-          quantity: trade.quantity,
-          ordertype: "MARKET",
-          producttype: trade.producttype,
-        });
+        // placeOrder({
+        //   tradingsymbol: trade.tradingsymbol,
+        //   symboltoken: trade.symboltoken,
+        //   exchange: trade.exchange,
+        //   type: "SELL",
+        //   quantity: trade.quantity,
+        //   ordertype: "MARKET",
+        //   producttype: trade.producttype,
+        // });
 
         closeTrade(trade.tradingsymbol);
         console.log(`✅ ${trade.tradingsymbol} position closed.`);

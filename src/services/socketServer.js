@@ -11,19 +11,18 @@ function initSocketServer(httpServer) {
     console.log(`⚡ Client connected: ${socket.id}`);
     console.log("👥 Total clients:", io.engine.clientsCount);
 
-    // ✅ Emit the latest feed/session status right after connection
+    // ✅ Send initial feed/session status immediately
     const currentStatus = getFeedStatus();
     console.log("📡 Sending current feedStatus:", currentStatus);
     socket.emit("feedStatus", currentStatus);
 
-    // Handle frontend subscription
+    // ✅ Handle frontend subscriptions (optional for specific tokens)
     socket.on("subscribe", (token) => {
       socket.join(token);
       console.log(`📩 Client subscribed to ${token}`);
 
-      // ✅ Also send feedStatus again on subscription
+      // Re-send feed status on subscribe
       const status = getFeedStatus();
-      console.log("📡 Sending feedStatus on subscribe:", status);
       socket.emit("feedStatus", status);
     });
 
@@ -33,14 +32,28 @@ function initSocketServer(httpServer) {
     });
   });
 
-  // Broadcast updates to everyone
-  feedEmitter.on("tick", (tick) => io.emit("tick", tick));
-  feedEmitter.on("order", (order) => io.emit("orderUpdate", order));
+  // =====================================
+  // 🌍 Broadcast from Angel Feed → Clients
+  // =====================================
+
+  // 1️⃣ Live tick data (LTP updates)
+  feedEmitter.on("tick", (tick) => {
+    io.emit("tick", tick);
+  });
+
+  // 2️⃣ Order updates (execution/cancel/reject)
+  feedEmitter.on("orderUpdate", (order) => {
+    console.log(`📦 Broadcasting orderUpdate: ${order.tradingsymbol} → ${order.status}`);
+    io.emit("orderUpdate", order);
+  });
+
+  // 3️⃣ Feed connection status
   feedEmitter.on("feedStatus", (status) => {
     console.log("📢 Broadcasting feedStatus update:", status);
     io.emit("feedStatus", status);
   });
 
+  console.log("🔌 Socket.IO initialized and linked to feedEmitter ✅");
   return io;
 }
 

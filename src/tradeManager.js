@@ -1,94 +1,78 @@
-// tradeManager.js
-
+// src/tradeManager.js
 const { feedEmitter } = require("./services/angelFeed");
 const {
   updateTrade,
   updatePnL,
   getActiveTrades,
-  getTrades,
   closeTrade,
+  getTrades,
 } = require("./data/trades");
-const { placeOrder } = require("./controllers/orderController");
 
-/**
- * Initialize Trade Manager
- * Handles live price updates and trade logic decisions
- */
 function initTradeManager() {
   console.log("🧠 Trade Manager running...");
 
-  // Listen to every live tick from Angel Feed
+  // ✅ Tick updates → update PnL and strategy logic
   feedEmitter.on("tick", (tick) => {
-    const symbol = tick.symbol || tick.tradingsymbol;
-    const ltp = tick.ltp;
+    // Extract and sanitize token properly
+    let symboltoken =
+      tick.symboltoken ||
+      tick.token ||
+      tick.Token ||
+      tick.symbol ||
+      tick.tradingsymbol;
 
-    if (!symbol || !ltp) return; // sanity check
+    // ✅ Remove extra quotes and spaces
+    symboltoken = symboltoken?.toString().replace(/['"]+/g, "").trim();
 
-    // Update trade LTP and PnL
-    updatePnL(symbol, ltp);
+    const ltp = parseFloat(tick.ltp / 100 || tick.last_traded_price / 100);
+    if (!symboltoken || !ltp) return;
 
-    // Get all running trades
-    const activeTrades = getActiveTrades();
+    updatePnL(symboltoken, ltp);
 
-    // Print for debugging (optional)
-    console.log("📊 Active Trades:", activeTrades);
-
-    // Run strategy logic for each trade
-    activeTrades.forEach((trade) => {
-      const loss = trade.profit_loss || 0;
+    const active = getActiveTrades();
+    // console.log("trade",getTrades())
+    active.forEach((trade) => {
+      const loss = trade.profit_loss;
       const stopLoss = trade.stop_loss || 800;
 
-      // 1️⃣ Stop-loss condition
-      if (Math.abs(loss) >= stopLoss && trade.trade_status !== "closed") {
-        console.log(`🚨 ${trade.tradingsymbol} loss ₹${loss} > SL ₹${stopLoss}, selling...`);
-
-        // Close position (mock)
-        // placeOrder({
-        //   tradingsymbol: trade.tradingsymbol,
-        //   symboltoken: trade.symboltoken,
-        //   exchange: trade.exchange,
-        //   type: "SELL",
-        //   quantity: trade.quantity,
-        //   ordertype: "MARKET",
-        //   producttype: trade.producttype,
-        // });
-
-        closeTrade(trade.tradingsymbol);
-        console.log(`✅ ${trade.tradingsymbol} position closed.`);
-        return;
-      }
-
-      // 2️⃣ Optional: Trailing stop logic
-      if (trade.trail === "50%" && loss > 0.5 * stopLoss) {
-        const newSL = stopLoss / 2;
-        updateTrade(trade.tradingsymbol, { stop_loss: newSL });
-        console.log(`📈 ${trade.tradingsymbol} trailing SL moved to ₹${newSL}`);
-      }
-
-      if (trade.trail === "75%" && loss > 0.75 * stopLoss) {
-        const newSL = stopLoss / 4;
-        updateTrade(trade.tradingsymbol, { stop_loss: newSL });
-        console.log(`📈 ${trade.tradingsymbol} trailing SL tightened to ₹${newSL}`);
-      }
-
-      // 3️⃣ Optional: Profit booking
-      if (trade.limit_sell_price && ltp >= trade.limit_sell_price) {
-        console.log(`🎯 ${trade.tradingsymbol} hit target ₹${ltp}, selling...`);
-        placeOrder({
-          tradingsymbol: trade.tradingsymbol,
-          symboltoken: trade.symboltoken,
-          exchange: trade.exchange,
-          type: "SELL",
-          quantity: trade.quantity,
-          ordertype: "MARKET",
-          producttype: trade.producttype,
-        });
-        closeTrade(trade.tradingsymbol);
+      if (Math.abs(loss) >= stopLoss && trade.trade_status === "running") {
+        console.log(`🚨 ${symboltoken} hit stop-loss ₹${loss}, closing...`);
+        closeTrade(symboltoken);
       }
     });
   });
 
-  console.log("📡 Trade Manager subscribed to feedEmitter ticks.");
+  // ✅ Order updates → update trade status
+  feedEmitter.on("orderUpdate", (order) => {
+    console.log("orderUpdate", order);
+    const symboltoken = order.symboltoken.toString();
+    const status = order.status?.toLowerCase();
+    console.log("orderdata", symboltoken, status);
+    if (!symboltoken) return;
+
+    if (status === "complete") {
+      if (order.transactiontype === "BUY") {
+        updateTrade(symboltoken, {
+          trade_status: "running",
+          buy_price: order.averageprice,
+          quantity:order.quantity
+        });
+      } else if (order.transactiontype === "SELL") {
+        updateTrade(symboltoken, { trade_status: "closed" });
+        updateTrade(symboltoken, { sell_price: order.averageprice });
+      }
+      console.log(`✅ ${symboltoken} trade now RUNNING`);
+    } else if (status === "cancelled" || status === "rejected") {
+      updateTrade(symboltoken, { trade_status: status });
+      console.log(`⚠️ ${symboltoken} trade ${status}`);
+    } else {
+      updateTrade(symboltoken, { trade_status: status });
+    }
+
+    console.log("trade", getTrades());
+  });
+
+  console.log("📡 Trade Manager subscribed to feedEmitter ✅");
 }
 
 module.exports = { initTradeManager };

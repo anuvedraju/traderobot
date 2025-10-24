@@ -2,10 +2,10 @@
 const { WebSocketV2 } = require("smartapi-javascript");
 const WebSocket = require("ws");
 const EventEmitter = require("events");
-
+const dotenv = require("dotenv");
 const feedEmitter = new EventEmitter();
+dotenv.config();
 
-// Global state
 let marketWS = null;
 let orderWS = null;
 let isConnected = false;
@@ -14,11 +14,10 @@ let isSessionActive = false;
 let reconnectTimer = null;
 let listenersAttached = false;
 
-// 🔹 Exchange Mapping
 const exchangeMap = { NSE: 1, NFO: 2, BSE: 3, BFO: 4, MCX: 5 };
 
 /**
- * Initialize Market Feed WebSocket
+ * Initialize both Market Feed and Order Status Feed
  */
 async function initAngelFeed({ jwtToken, feedToken }) {
   const apiKey = process.env.ANGEL_ONE_API_KEY;
@@ -28,11 +27,12 @@ async function initAngelFeed({ jwtToken, feedToken }) {
     throw new Error("Missing jwtToken or feedToken for feed initialization");
 
   if (isConnected && marketWS) {
-    console.log("⚙️ Market feed already connected, skipping init.");
-    return marketWS;
+    console.log("⚙️ Market feed already connected.");
+    return;
   }
 
   try {
+    // --- Market Feed (LTP / Tick) ---
     marketWS = new WebSocketV2({
       jwttoken: jwtToken,
       apikey: apiKey,
@@ -41,21 +41,17 @@ async function initAngelFeed({ jwtToken, feedToken }) {
     });
 
     await marketWS.connect();
-    isConnected = true;
-    isFeedConnected = true;
-    isSessionActive = true;
+    isConnected = isFeedConnected = isSessionActive = true;
 
     console.log("📡 Market WebSocket connected ✅");
     emitFeedStatus();
-
     attachMarketListeners(jwtToken, feedToken);
 
-    // ✅ Initialize Order Status WebSocket
-    initOrderStatusFeed(jwtToken, clientCode);
+    // --- Order Feed (Status Updates) ---
+    initOrderStatusFeed(jwtToken);
 
-    return marketWS;
   } catch (err) {
-    console.error("❌ Failed to connect Angel One Market Feed:", err.message || err);
+    console.error("❌ Failed to connect Angel Feed:", err.message);
     isFeedConnected = false;
     emitFeedStatus();
     scheduleReconnect(jwtToken, feedToken);
@@ -63,7 +59,7 @@ async function initAngelFeed({ jwtToken, feedToken }) {
 }
 
 /**
- * Attach listeners for Market Feed
+ * Market feed listeners
  */
 function attachMarketListeners(jwtToken, feedToken) {
   if (!marketWS || listenersAttached) return;
@@ -71,15 +67,14 @@ function attachMarketListeners(jwtToken, feedToken) {
   marketWS.on("tick", (data) => feedEmitter.emit("tick", data));
 
   marketWS.on("error", (err) => {
-    console.error("❌ Market feed error:", err.message || err);
+    console.error("❌ Market feed error:", err.message);
     isFeedConnected = false;
     emitFeedStatus();
   });
 
   marketWS.on("close", () => {
-    console.warn("🔌 Market feed closed — retrying in 10s...");
-    isConnected = false;
-    isFeedConnected = false;
+    console.warn("🔌 Market feed closed — reconnecting...");
+    isConnected = isFeedConnected = false;
     emitFeedStatus();
     listenersAttached = false;
     scheduleReconnect(jwtToken, feedToken);
@@ -90,113 +85,86 @@ function attachMarketListeners(jwtToken, feedToken) {
 }
 
 /**
- * ✅ Initialize the official Angel One Order Status WebSocket
- * Endpoint: wss://tns.angelone.in/smart-order-update
+ * Angel One Order Status WebSocket
+ * wss://tns.angelone.in/smart-order-update
  */
-function initOrderStatusFeed(jwtToken, clientCode) {
-  const ORDER_FEED_URL = "wss://tns.angelone.in/smart-order-update";
+function initOrderStatusFeed(jwtToken) {
 
-  try {
-    console.log("📦 Connecting to Angel One Order Status WebSocket...");
 
-    orderWS = new WebSocket(ORDER_FEED_URL, {
-      headers: {
-        Authorization: `Bearer ${jwtToken}`,
-      },
-    });
+  console.log("📦 Connecting to Order Status Feed...");
+  orderWS = new WebSocket(process.env.ORDER_FEED_URL, {
+    headers: { Authorization: `Bearer ${jwtToken}` },
+  });
 
-    orderWS.on("open", () => {
-      console.log("📦 Order Status WebSocket connected ✅");
-      // Send initial ping every 10s to keep the connection alive
-      setInterval(() => {
-        if (orderWS.readyState === WebSocket.OPEN) {
-          orderWS.send(JSON.stringify({ ping: "ping" }));
-        }
-      }, 10000);
-    });
+  orderWS.on("open", () => {
+    console.log("📦 Order Feed connected ✅");
+    startHeartbeat();
+  });
 
-    orderWS.on("message", (msg) => {
-      try {
-        // 🧩 1️⃣ Handle plain "pong" text from server
-        if (msg === "pong" || msg.toString().trim() === "pong") {
-          // Optional: console.log("🔁 Pong received (connection alive)");
-          return;
-        }
-    
-        // 🧩 2️⃣ Parse JSON messages only
-        const data = JSON.parse(msg);
-    
-        // 🧩 3️⃣ Handle valid order update messages
-        if (data["status-code"] === "200" && data.orderData) {
-          const order = data.orderData;
-          const statusCode = data["order-status"];
-    
-          const statusMap = {
-            AB01: "open",
-            AB02: "cancelled",
-            AB03: "rejected",
-            AB04: "modified",
-            AB05: "complete",
-            AB09: "pending",
-            AB10: "trigger pending",
-          };
-    
-          order.status = statusMap[statusCode] || order.status || "unknown";
-    
-          console.log(
-            `📬 Order Update: ${order.tradingsymbol} (${order.orderid}) → ${order.status}`
-          );
-    
-          feedEmitter.emit("orderUpdate", order);
-        }
-      } catch (err) {
-        console.error("⚠️ Error parsing order message:", err.message);
-      }
-    });
+  orderWS.on("message", (msg) => {
+    try {
+      if (msg === "pong" || msg.toString().trim() === "pong") return; // ignore ping/pong
+      const data = JSON.parse(msg);
+      if (data["status-code"] !== "200" || !data.orderData) return;
 
-    orderWS.on("close", () => {
-      console.warn("🧱 Order Status WebSocket closed — reconnecting in 10s...");
-      setTimeout(() => initOrderStatusFeed(jwtToken, clientCode), 10000);
-    });
+      const order = data.orderData;
+      const code = data["order-status"];
+      const statusMap = {
+        AB01: "open",
+        AB02: "cancelled",
+        AB03: "rejected",
+        AB04: "modified",
+        AB05: "complete",
+        AB09: "pending",
+        AB10: "trigger pending",
+      };
+      order.status = statusMap[code] || "unknown";
+      feedEmitter.emit("orderUpdate", order);
+    } catch (err) {
+      console.error("⚠️ Error parsing order message:", err.message);
+    }
+  });
 
-    orderWS.on("error", (err) => {
-      console.error("❌ Order Status WebSocket error:", err.message);
-    });
-  } catch (err) {
-    console.error("❌ Failed to connect Order Status Feed:", err.message || err);
-  }
+  orderWS.on("close", () => {
+    console.warn("🧱 Order feed closed — reconnecting in 10s...");
+    setTimeout(() => initOrderStatusFeed(jwtToken), 10000);
+  });
+
+  orderWS.on("error", (err) => {
+    console.error("❌ Order feed error:", err.message);
+  });
 }
 
 /**
- * Schedule reconnection for Market Feed
+ * Send periodic ping to keep WS alive
+ */
+function startHeartbeat() {
+  setInterval(() => {
+    if (orderWS?.readyState === WebSocket.OPEN) {
+      orderWS.send("ping");
+    }
+  }, 10000);
+}
+
+/**
+ * Reconnect Market Feed
  */
 function scheduleReconnect(jwtToken, feedToken, delay = 10000) {
   if (reconnectTimer) clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(
-    () => reconnectFeed({ jwtToken, feedToken }),
-    delay
-  );
+  reconnectTimer = setTimeout(() => reconnectFeed({ jwtToken, feedToken }), delay);
 }
 
-/**
- * Attempt reconnection
- */
 async function reconnectFeed({ jwtToken, feedToken }) {
-  try {
-    console.log("♻️ Reconnecting to Market Feed...");
-    await initAngelFeed({ jwtToken, feedToken });
-  } catch (err) {
-    console.error("❌ Market feed reconnection failed:", err.message || err);
-    scheduleReconnect(jwtToken, feedToken, 15000);
-  }
+  console.log("♻️ Reconnecting to Market Feed...");
+  await initAngelFeed({ jwtToken, feedToken });
 }
 
 /**
- * Subscribe to market tokens dynamically
+ * Subscribe dynamically to instruments
  */
 function subscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
   if (!marketWS || !isConnected)
-    return console.warn("⚠️ Market feed not ready yet. Cannot subscribe.");
+    return console.warn("⚠️ Market feed not ready yet.");
 
   const exType =
     typeof exchangeType === "string"
@@ -213,33 +181,23 @@ function subscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
 
   try {
     marketWS.fetchData(subReq);
-    console.log(`✅ Subscribed to ${subReq.tokens.join(", ")} [${exchangeType} → ${exType}]`);
+    console.log(`✅ Subscribed to ${subReq.tokens.join(", ")} [${exchangeType}]`);
   } catch (err) {
-    console.error("⚠️ Subscription failed:", err.message || err);
+    console.error("⚠️ Subscription failed:", err.message);
   }
 }
 
 /**
- * Emit feed status
+ * Feed status emitters
  */
 function emitFeedStatus() {
-  const status = { isFeedConnected, isSessionActive };
-  feedEmitter.emit("feedStatus", status);
+  feedEmitter.emit("feedStatus", { isFeedConnected, isSessionActive });
 }
-
-/**
- * Get current feed status
- */
 function getFeedStatus() {
   return { isFeedConnected, isSessionActive };
 }
-
-/**
- * Toggle session status
- */
 function setSessionStatus(status) {
   isSessionActive = Boolean(status);
-  console.log(`🔐 Session active: ${isSessionActive}`);
   emitFeedStatus();
 }
 
@@ -250,6 +208,3 @@ module.exports = {
   feedEmitter,
   getFeedStatus,
 };
-
-
-

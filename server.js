@@ -19,11 +19,11 @@ const server = http.createServer(app);
 
 async function startServer() {
   try {
-    // Start HTTP + Socket.IO
+    // 1️⃣ Start HTTP + Socket.IO
     server.listen(PORT, () => console.log(`🚀 Traderobot running on port ${PORT}`));
     const io = initSocketServer(server);
 
-    // Auto-login SmartAPI
+    // 2️⃣ Auto-login SmartAPI
     const loginData = await autoLogin();
     const { jwtToken, feedToken } = loginData?.data || {};
     if (!jwtToken || !feedToken)
@@ -31,34 +31,26 @@ async function startServer() {
 
     console.log("✅ SmartAPI Login Successful");
 
-    // Initialize feeds
+    // 3️⃣ Initialize WebSockets (Tick + Order Feed)
     await initAngelFeed({ jwtToken, feedToken });
-    console.log("✅ Angel One WebSockets Active");
+    console.log("✅ Angel One Feeds Active");
 
-    // Subscribe to test instrument
-    subscribeTokens("116750", "NFO");
-
-    // Initialize Trade Manager (auto logic)
+    // 4️⃣ Initialize Trade Manager (strategy brain)
     initTradeManager();
 
-    // Forward all events to connected clients
-
-
-    // 8️⃣ Listen for live ticks
+    // 5️⃣ Subscribe to feed events
     feedEmitter.on("tick", (tick) => {
-      console.log("📈 Tick received:", tick);
-      // Example: you can broadcast ticks to all socket
+      // console.log("📈 Tick received:", tick);
+      // Example: you can broadcast ticks to all sockets
       io.emit("tick", tick);
     });
 
-    // 9️⃣ Listen for feed connection changes
     feedEmitter.on("feedStatus", (status) => {
       io.emit("feedStatus", status);
     });
 
-
     feedEmitter.on("orderUpdate", (order) => {
-      console.log("📡 Broadcasting Order Update:", order.tradingsymbol, order.status);
+      console.log(`📦 Order Update: ${order.tradingsymbol} → ${order.status}`);
       io.emit("orderUpdate", order);
     });
 

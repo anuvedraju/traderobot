@@ -1,0 +1,22 @@
+[
+  {
+    "tradingsymbol": "YESBANK-EQ",
+    "symboltoken": "11915",
+    "exchange": "NSE",
+    "orderid": "251024000880166",
+    "producttype": "INTRADAY",
+    "variety": "NORMAL",
+    "duration": "DAY",
+    "quantity": 2,
+    "buy_price": 22.68,
+    "last_traded_price": 22.7,
+    "profit_loss": 0,
+    "higest_profit": 0,
+    "limit_sell_price": null,
+    "stop_loss": 20,
+    "trail": "50%",
+    "trade_status": "rejected",
+    "createdAt": "2025-10-24T09:47:23.707Z",
+    "updatedAt": "2025-10-24T09:47:43.161Z"
+  }
+]

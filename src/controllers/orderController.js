@@ -36,7 +36,7 @@ exports.placeOrder = async (req, res) => {
       duration: orderParams.duration,
       buy_price: orderParams.price,
       quantity: orderParams.quantity,
-      stop_loss: 20,
+      stop_loss: 10,
       trail: "50%",
       trade_status: "pending",
     });

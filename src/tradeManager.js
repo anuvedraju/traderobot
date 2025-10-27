@@ -4,9 +4,9 @@ const {
   updateTrade,
   updatePnL,
   getActiveTrades,
-  closeTrade,
   getTrades,
 } = require("./data/trades");
+const { closeTrade } = require("./functions");
 
 function initTradeManager() {
   console.log("🧠 Trade Manager running...");
@@ -35,7 +35,7 @@ function initTradeManager() {
       const loss = trade.profit_loss;
       const stopLoss = trade.stop_loss || 800;
 
-      if (Math.abs(loss) >= stopLoss && trade.trade_status === "running") {
+      if (loss <= -stopLoss && trade.trade_status === "running") {
         console.log(`🚨 ${symboltoken} hit stop-loss ₹${loss}, closing...`);
         closeTrade(symboltoken);
       }

@@ -78,12 +78,19 @@ function updatePnL(symboltoken, ltp) {
 function getTrades() {
   return trades;
 }
+
+function getTradesBySymbol(token) {
+  return trades.find((t) => t.symboltoken === token);
+}
+
 function getActiveTrades() {
   return trades.filter((t) => t.trade_status === "running");
 }
-function closeTrade(symbol) {
-  updateTrade(symbol, { trade_status: "closed" });
-}
+// function closeTrade(symbol) {
+
+//   updateTrade(symbol, { trade_status: "closed" });
+//   console.log("trade Closed")
+// }
 function clearTrades() {
   trades = [];
 }
@@ -106,6 +113,6 @@ module.exports = {
   updatePnL,
   getTrades,
   getActiveTrades,
-  closeTrade,
+  getTradesBySymbol,
   clearTrades,
 };

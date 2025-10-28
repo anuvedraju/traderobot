@@ -107,7 +107,7 @@ exports.searchSymbol = async (req, res) => {
     // Simplify output for frontend
     const simplified = results.slice(0, 25).map((r) => ({
       tradingsymbol: r.tradingsymbol,
-      name: `${r.name} ${r.strike/100} ${r.symbol.slice(-2)} ${r.expiry}`,
+      name: `${r.name} ${r.strike/100} ${r.symbol.slice(-2)}`,
       symbol: r.symbol,
       lotsize:r.lotsize,
       token:r.token,

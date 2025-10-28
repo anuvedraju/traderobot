@@ -8,12 +8,26 @@ const {
 } = require("./data/trades");
 const { closeTrade } = require("./functions");
 
+/**
+ * Initialize and manage trade updates from live ticks and orders.
+ */
 function initTradeManager() {
-  console.log("🧠 Trade Manager running...");
+  console.log("🧠 Trade Manager initialized...");
 
-  // ✅ Tick updates → update PnL and strategy logic
-  feedEmitter.on("tick", (tick) => {
-    // Extract and sanitize token properly
+  // --- Handle live ticks ---
+  feedEmitter.on("tick", handleTick);
+  // --- Handle order updates ---
+  feedEmitter.on("orderUpdate", handleOrderUpdate);
+
+  console.log("📡 Trade Manager subscribed to feedEmitter ✅");
+}
+
+/**
+ * Handle tick updates: update PnL, manage stop-loss logic.
+ */
+function handleTick(tick) {
+  try {
+    // --- Normalize symboltoken ---
     let symboltoken =
       tick.symboltoken ||
       tick.token ||
@@ -21,58 +35,84 @@ function initTradeManager() {
       tick.symbol ||
       tick.tradingsymbol;
 
-    // ✅ Remove extra quotes and spaces
-    symboltoken = symboltoken?.toString().replace(/['"]+/g, "").trim();
+    symboltoken = symboltoken?.toString().replace(/['"\s]+/g, "").trim();
 
-    const ltp = parseFloat(tick.ltp / 100 || tick.last_traded_price / 100);
-    if (!symboltoken || !ltp) return;
+    if (!symboltoken) return;
 
+    // --- Normalize LTP ---
+    const ltpRaw = tick.ltp ?? tick.last_traded_price;
+    if (!ltpRaw || isNaN(ltpRaw)) return;
+
+    const ltp = parseFloat(ltpRaw) / 100;
+    if (!ltp || ltp <= 0) return;
+
+    // --- Update trade PnL ---
     updatePnL(symboltoken, ltp);
 
-    const active = getActiveTrades();
-    // console.log("trade",getTrades())
-    active.forEach((trade) => {
-      const loss = trade.profit_loss;
-      const stopLoss = trade.stop_loss || 800;
+    // --- Check stop-loss condition for this symbol ---
+    const activeTrades = getActiveTrades();
 
-      if (loss <= -stopLoss && trade.trade_status === "running") {
+    // Find only the matching trades to minimize loop overhead
+    const symbolTrades = activeTrades.filter(
+      (t) => t.symboltoken?.toString() === symboltoken.toString()
+    );
+
+    for (const trade of symbolTrades) {
+      const loss = Number(trade.profit_loss || 0);
+      const stopLoss = Number(trade.stop_loss || 800);
+
+      if (trade.trade_status === "running" && loss <= -stopLoss) {
         console.log(`🚨 ${symboltoken} hit stop-loss ₹${loss}, closing...`);
         closeTrade(symboltoken);
       }
-    });
-  });
+    }
+  } catch (err) {
+    console.error("❌ [TradeManager] Tick processing error:", err.message);
+  }
+}
 
-  // ✅ Order updates → update trade status
-  feedEmitter.on("orderUpdate", (order) => {
-    console.log("orderUpdate", order);
-    const symboltoken = order.symboltoken.toString();
+/**
+ * Handle order updates: sync trade states with SmartAPI order feed.
+ */
+function handleOrderUpdate(order) {
+  try {
+    if (!order) return;
+
+    const symboltoken = order.symboltoken?.toString().trim();
     const status = order.status?.toLowerCase();
-    console.log("orderdata", symboltoken, status);
-    if (!symboltoken) return;
+    const txnType = order.transactiontype?.toUpperCase();
+
+    if (!symboltoken || !status) return;
+
+    console.log(`📦 Order update: ${symboltoken} → ${status}`);
+
+    const updates = {};
 
     if (status === "complete") {
-      if (order.transactiontype === "BUY") {
-        updateTrade(symboltoken, {
-          trade_status: "running",
-          buy_price: order.averageprice,
-          quantity:order.quantity
-        });
-      } else if (order.transactiontype === "SELL") {
-        updateTrade(symboltoken, { trade_status: "closed" });
-        updateTrade(symboltoken, { sell_price: order.averageprice });
+      if (txnType === "BUY") {
+        updates.trade_status = "running";
+        updates.buy_price = order.averageprice || 0;
+        updates.quantity = order.quantity || 0;
+      } else if (txnType === "SELL") {
+        updates.trade_status = "closed";
+        updates.sell_price = order.averageprice || 0;
       }
-      console.log(`✅ ${symboltoken} trade now RUNNING`);
-    } else if (status === "cancelled" || status === "rejected") {
-      updateTrade(symboltoken, { trade_status: status });
-      console.log(`⚠️ ${symboltoken} trade ${status}`);
+    } else if (["cancelled", "rejected"].includes(status)) {
+      updates.trade_status = status;
     } else {
-      updateTrade(symboltoken, { trade_status: status });
+      updates.trade_status = status;
     }
 
-    console.log("trade", getTrades());
-  });
+    updateTrade(symboltoken, updates);
 
-  console.log("📡 Trade Manager subscribed to feedEmitter ✅");
+    if (updates.trade_status)
+      console.log(`✅ ${symboltoken} trade → ${updates.trade_status.toUpperCase()}`);
+
+    // Optional: keep this for debugging
+    // console.log("📊 Current trades:", getTrades());
+  } catch (err) {
+    console.error("❌ [TradeManager] Order update error:", err.message);
+  }
 }
 
 module.exports = { initTradeManager };

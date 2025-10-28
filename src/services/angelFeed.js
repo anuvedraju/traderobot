@@ -187,6 +187,31 @@ function subscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
   }
 }
 
+function unsubscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
+  if (!marketWS || !isConnected)
+    return console.warn("⚠️ Market feed not ready yet.");
+
+  const exType =
+    typeof exchangeType === "string"
+      ? exchangeMap[exchangeType.toUpperCase()] || 1
+      : exchangeType;
+
+  const unsubReq = {
+    correlationID: `unsub_${Date.now()}`,
+    action: 0, // 0 = Unsubscribe
+    mode,
+    exchangeType: exType,
+    tokens: Array.isArray(tokens) ? tokens : [tokens],
+  };
+
+  try {
+    marketWS.fetchData(unsubReq);
+    console.log(`🛑 Unsubscribed from ${unsubReq.tokens.join(", ")} [${exchangeType}]`);
+  } catch (err) {
+    console.error("⚠️ Unsubscription failed:", err.message || err);
+  }
+}
+
 /**
  * Feed status emitters
  */
@@ -204,6 +229,7 @@ function setSessionStatus(status) {
 module.exports = {
   initAngelFeed,
   subscribeTokens,
+  unsubscribeTokens,
   setSessionStatus,
   feedEmitter,
   getFeedStatus,

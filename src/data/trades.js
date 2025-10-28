@@ -2,106 +2,156 @@
 const { subscribeTokens } = require("../services/angelFeed");
 const fs = require("fs");
 const path = require("path");
-let trades = [];
 
-function addTrade(order) {
+let trades = [];
+let saveTimer = null; // 🕒 Debounce file writes
+
+const FILE_PATH = path.join(__dirname, "trades.json");
+
+/**
+ * Adds a new trade to memory and subscribes to its token feed.
+ */
+function addTrade(order = {}) {
+  if (!order.symboltoken || !order.tradingsymbol) {
+    console.error("❌ Cannot add trade — missing symboltoken/tradingsymbol:", order);
+    return null;
+  }
+
   const trade = {
     tradingsymbol: order.tradingsymbol,
-    symboltoken: order.symboltoken,
+    symboltoken: order.symboltoken.toString(),
     exchange: order.exchange || "NFO",
     orderid: order.orderid || null,
     producttype: order.producttype || "INTRADAY",
     variety: order.variety || "NORMAL",
     duration: order.duration || "DAY",
-    quantity: order.quantity || 1,
-    buy_price: order.buy_price || 0,
+    quantity: Number(order.quantity) || 1,
+    buy_price: Number(order.buy_price) || 0,
     last_traded_price: 0,
     profit_loss: 0,
-    higest_profit: 0,
-    limit_sell_price: order.limit_sell_price || null,
-    stop_loss: order.stop_loss || 800,
+    highest_profit: 0,
+    limit_sell_price: Number(order.limit_sell_price) || null,
+    stop_loss: Number(order.stop_loss) || 800,
     trail: order.trail || "none",
     trade_status: order.trade_status || "pending",
     createdAt: new Date(),
     updatedAt: new Date(),
-    //sellprice added trade completion
   };
 
   trades.push(trade);
-  console.log("✅ Trade added:", trade.tradingsymbol);
-  saveTradesToFile();
-  subscribeTokens(order.symboltoken, order.exchange); // subscribe dynamically
+  console.log(`✅ Trade added: ${trade.tradingsymbol} (${trade.symboltoken})`);
+
+  // Save + subscribe
+  scheduleSave();
+  subscribeTokens(trade.symboltoken, trade.exchange);
+
   return trade;
 }
 
-function updateTrade(identifier, updateData) {
-  console.log("orderdata", identifier, updateData);
-  const t = trades.find(
-    (t) => t.symboltoken === identifier.toString() || t.orderid === identifier
-  );
-  if (!t) return;
-  console.log("ttttt", t);
+/**
+ * Updates an existing trade by symboltoken or orderid.
+ */
+function updateTrade(identifier, updateData = {}) {
+  if (!identifier) return;
 
-  Object.assign(t, updateData, { updatedAt: new Date() });
-  saveTradesToFile();
-}
-
-function updatePnL(symboltoken, ltp) {
-  console.log("update", symboltoken, ltp);
-
-  // 🧩 Find ALL trades with the same symboltoken
-  const matchingTrades = trades.filter(
-    (t) => t.symboltoken.toString() === symboltoken.toString()
+  const idStr = identifier.toString();
+  const trade = trades.find(
+    (t) => t.symboltoken === idStr || t.orderid === idStr
   );
 
-  if (matchingTrades.length === 0) {
-    console.log(`⚠️ No trades found for token ${symboltoken}`);
+  if (!trade) {
+    console.warn(`⚠️ No trade found for identifier: ${identifier}`);
     return;
   }
 
-  matchingTrades.forEach((t) => {
-    // Update latest price
+  Object.assign(trade, updateData, { updatedAt: new Date() });
+  scheduleSave();
+
+  // Debug log (only for important changes)
+  if (updateData.trade_status) {
+    console.log(
+      `📝 Trade ${trade.tradingsymbol} updated → ${updateData.trade_status.toUpperCase()}`
+    );
+  }
+}
+
+/**
+ * Updates profit/loss (PnL) for all trades of a given symboltoken.
+ */
+function updatePnL(symboltoken, ltp) {
+  if (!symboltoken || !ltp) return;
+
+  const tokenStr = symboltoken.toString();
+  const tokenTrades = trades.filter((t) => t.symboltoken === tokenStr);
+
+  if (tokenTrades.length === 0) return;
+
+  tokenTrades.forEach((t) => {
     t.last_traded_price = ltp;
 
-    // Update P&L only for running trades
     if (t.trade_status === "running") {
-      t.profit_loss = Number(((ltp - t.buy_price) * t.quantity).toFixed(2));
-      t.higest_profit = Math.max(t.higest_profit || 0, t.profit_loss);
+      const pnl = (ltp - t.buy_price) * t.quantity;
+      t.profit_loss = Number(pnl.toFixed(2));
+      t.highest_profit = Math.max(t.highest_profit || 0, t.profit_loss);
     }
 
     t.updatedAt = new Date();
   });
 
-  saveTradesToFile();
+  scheduleSave();
 }
 
+/**
+ * Returns all trades.
+ */
 function getTrades() {
   return trades;
 }
 
-function getTradesBySymbol(token) {
-  return trades.find((t) => t.symboltoken === token);
+/**
+ * Returns a single trade by symboltoken or tradingsymbol.
+ */
+function getTradesBySymbol(symbol) {
+  const symStr = symbol?.toString();
+  return trades.find(
+    (t) =>
+      t.symboltoken === symStr ||
+      t.tradingsymbol === symStr ||
+      t.orderid === symStr
+  );
 }
 
+/**
+ * Returns only currently running trades.
+ */
 function getActiveTrades() {
   return trades.filter((t) => t.trade_status === "running");
 }
-// function closeTrade(symbol) {
 
-//   updateTrade(symbol, { trade_status: "closed" });
-//   console.log("trade Closed")
-// }
+/**
+ * Clears all trades from memory and file.
+ */
 function clearTrades() {
   trades = [];
+  saveToFile();
+  console.log("🧹 Cleared all trades.");
 }
 
-function saveTradesToFile() {
-  const filePath = path.join(__dirname, "./trades.json");
+/**
+ * Schedules saving trades to disk (debounced for efficiency).
+ */
+function scheduleSave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToFile, 1000); // ⏳ delay saves by 1s to batch updates
+}
 
+/**
+ * Saves the current trades array to disk.
+ */
+function saveToFile() {
   try {
-    // Write formatted JSON (pretty 2-space indentation)
-    fs.writeFileSync(filePath, JSON.stringify(trades, null, 2), "utf-8");
-    // console.log("💾 Trades saved to file.");
+    fs.writeFileSync(FILE_PATH, JSON.stringify(trades, null, 2), "utf-8");
+    // console.log("💾 Trades saved.");
   } catch (err) {
     console.error("❌ Failed to save trades:", err.message);
   }

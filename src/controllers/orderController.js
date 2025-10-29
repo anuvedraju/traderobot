@@ -1,11 +1,20 @@
-
 const { addTrade } = require("../data/trades");
 const { getSmartApi } = require("./authorizationController");
 
-
-
 exports.placeOrder = async (req, res) => {
-  const { tradingsymbol, symboltoken, transactiontype, exchange, ordertype, producttype, price, quantity, variety, duration } = req.body;
+  const {
+    tradingsymbol,
+    symboltoken,
+    transactiontype,
+    exchange,
+    ordertype,
+    producttype,
+    price,
+    triggerprice,
+    quantity,
+    variety,
+    duration,
+  } = req.body;
 
   try {
     const smartApi = getSmartApi();
@@ -13,30 +22,32 @@ exports.placeOrder = async (req, res) => {
     const orderParams = {
       tradingsymbol,
       symboltoken,
-      transactiontype,  // "BUY" or "SELL"
+      transactiontype, // "BUY" or "SELL"
       exchange,
       ordertype,
       producttype,
+      triggerprice,
       variety,
       duration,
       price,
-      quantity
+      quantity,
     };
 
     const response = await smartApi.placeOrder(orderParams);
     res.json({ success: true, data: response });
-    console.log("data",response.data)
+    console.log("data", response.data);
     addTrade({
       tradingsymbol: orderParams.tradingsymbol,
       symboltoken: orderParams.symboltoken,
       exchange: orderParams.exchange,
+      transactiontype: orderParams.transactiontype,
       orderid: response.data.orderid,
       producttype: orderParams.producttype,
       variety: orderParams.variety,
       duration: orderParams.duration,
       buy_price: orderParams.price,
       quantity: orderParams.quantity,
-      stop_loss: 10,
+      stop_loss: 800,
       trail: "50%",
       trade_status: "pending",
     });
@@ -46,22 +57,20 @@ exports.placeOrder = async (req, res) => {
   }
 };
 
-
-
 // 🔹 Modify Existing Order
 exports.modifyOrder = async (req, res) => {
   const {
-    orderid,          // Required
-    tradingsymbol,    // Optional, for safety
-    symboltoken,      // Optional
-    exchange,         // e.g., "NFO"
-    ordertype,        // e.g., "LIMIT", "MARKET"
-    producttype,      // e.g., "CNC", "MIS"
-    duration,         // e.g., "DAY"
-    price,            // New price if LIMIT
-    quantity,         // New quantity
-    triggerprice,     // Optional for SL orders
-    variety           // e.g., "NORMAL", "STOPLOSS"
+    orderid, // Required
+    tradingsymbol, // Optional, for safety
+    symboltoken, // Optional
+    exchange, // e.g., "NFO"
+    ordertype, // e.g., "LIMIT", "MARKET"
+    producttype, // e.g., "CNC", "MIS"
+    duration, // e.g., "DAY"
+    price, // New price if LIMIT
+    quantity, // New quantity
+    triggerprice, // Optional for SL orders
+    variety, // e.g., "NORMAL", "STOPLOSS"
   } = req.body;
 
   try {
@@ -143,8 +152,6 @@ exports.cancelOrder = async (req, res) => {
   }
 };
 
-
-
 // 🔹 Sell at Market Price (Instant)
 exports.sellMarket = async (req, res) => {
   const {
@@ -163,7 +170,8 @@ exports.sellMarket = async (req, res) => {
     if (!tradingsymbol || !symboltoken || !quantity || !exchange) {
       return res.status(400).json({
         success: false,
-        message: "tradingsymbol, symboltoken, exchange and quantity are required",
+        message:
+          "tradingsymbol, symboltoken, exchange and quantity are required",
       });
     }
 
@@ -197,8 +205,6 @@ exports.sellMarket = async (req, res) => {
     });
   }
 };
-
-
 
 // 🔹 Get All Orders
 exports.getAllOrders = async (req, res) => {

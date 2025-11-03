@@ -40,7 +40,7 @@ async function startServer() {
 
     // 5️⃣ Subscribe to feed events
     feedEmitter.on("tick", (tick) => {
-      console.log("📈 Tick received:", tick);
+      // console.log("📈 Tick received:", tick);
       // Example: you can broadcast ticks to all sockets
       io.emit("tick", tick);
     });

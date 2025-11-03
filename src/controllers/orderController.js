@@ -14,6 +14,8 @@ exports.placeOrder = async (req, res) => {
     quantity,
     variety,
     duration,
+    stoploss
+
   } = req.body;
 
   try {
@@ -31,6 +33,7 @@ exports.placeOrder = async (req, res) => {
       duration,
       price,
       quantity,
+
     };
 
     const response = await smartApi.placeOrder(orderParams);
@@ -47,7 +50,7 @@ exports.placeOrder = async (req, res) => {
       duration: orderParams.duration,
       buy_price: orderParams.price,
       quantity: orderParams.quantity,
-      stop_loss: 800,
+      stop_loss: stoploss,
       trail: "50%",
       trade_status: "pending",
     });

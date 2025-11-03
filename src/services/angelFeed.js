@@ -120,6 +120,7 @@ function initOrderStatusFeed(jwtToken) {
       };
       order.status = statusMap[code] || "unknown";
       feedEmitter.emit("orderUpdate", order);
+      console.log("order",order)
     } catch (err) {
       console.error("⚠️ Error parsing order message:", err.message);
     }

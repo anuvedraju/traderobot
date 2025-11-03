@@ -5,6 +5,7 @@ const {
   updatePnL,
   getActiveTrades,
   getTrades,
+  setPnL,
 } = require("./data/trades");
 const { closeTrade } = require("./functions");
 
@@ -35,7 +36,10 @@ function handleTick(tick) {
       tick.symbol ||
       tick.tradingsymbol;
 
-    symboltoken = symboltoken?.toString().replace(/['"\s]+/g, "").trim();
+    symboltoken = symboltoken
+      ?.toString()
+      .replace(/['"\s]+/g, "")
+      .trim();
 
     if (!symboltoken) return;
 
@@ -96,9 +100,14 @@ function handleOrderUpdate(order) {
       } else if (txnType === "SELL") {
         updates.trade_status = "closed";
         updates.sell_price = order.averageprice || 0;
+        setPnL(symboltoken, order.averageprice);
       }
     } else if (["cancelled", "rejected"].includes(status)) {
-      updates.trade_status = status;
+      if (txnType === "SELL") {
+        console.log("orderRejected or cancelled");
+      } else {
+        updates.trade_status = status;
+      }
     } else {
       updates.trade_status = status;
     }
@@ -106,7 +115,9 @@ function handleOrderUpdate(order) {
     updateTrade(symboltoken, updates);
 
     if (updates.trade_status)
-      console.log(`✅ ${symboltoken} trade → ${updates.trade_status.toUpperCase()}`);
+      console.log(
+        `✅ ${symboltoken} trade → ${updates.trade_status.toUpperCase()}`
+      );
 
     // Optional: keep this for debugging
     // console.log("📊 Current trades:", getTrades());

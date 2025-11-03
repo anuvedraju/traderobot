@@ -161,7 +161,7 @@ function initSocketServer(httpServer) {
     if (now - lastTime < 200) return;
     lastEmitted.set(tokenStr, now);
 
-    io.to(tokenStr).emit("tradeUpdated", trade);
+    io.emit("tradeUpdated", trade);
   });
 
   console.log("🔌 Socket.IO server ready and bound to feed/trade emitters ✅");

@@ -24,7 +24,7 @@ function addTrade(order = {}) {
   const trade = {
     tradingsymbol,
     symboltoken: symboltoken.toString(),
-    exchange: order.exchange || "NFO",
+    exchange: order.exchange || "NSE",
     orderid: order.orderid || null,
     transactiontype: order.transactiontype || "",
     producttype: order.producttype || "INTRADAY",
@@ -84,6 +84,22 @@ function updatePnL(symboltoken, ltp) {
       t.highest_profit = Math.max(t.highest_profit || 0, t.profit_loss);
     }
     t.updatedAt = new Date();
+    console.debug("profit_updtaed",t.last_traded_price,t.profit_loss)
+    emitTrade(t);
+  });
+
+  scheduleSave();
+}
+function setPnL(symboltoken, price) {
+  if (!symboltoken || !price) return;
+  const token = symboltoken.toString();
+
+  const tokenTrades = trades.filter((t) => t.symboltoken === token);
+  if (!tokenTrades.length) return;
+
+  tokenTrades.forEach((t) => {
+    t.profit_loss = Number(((price - t.buy_price) * t.quantity).toFixed(2));
+    t.updatedAt = new Date();
     emitTrade(t);
   });
 
@@ -134,6 +150,7 @@ module.exports = {
   addTrade,
   updateTrade,
   updatePnL,
+  setPnL,
   getTrades,
   getActiveTrades,
   getTradesBySymbol,

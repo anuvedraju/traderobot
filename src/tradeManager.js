@@ -69,6 +69,14 @@ function handleTick(tick) {
         console.log(`🚨 ${symboltoken} hit stop-loss ₹${loss}, closing...`);
         closeTrade(symboltoken);
       }
+      // if (
+      //   trade.trade_status === "running" &&
+      //   trade.profit_loss >= 0.02 &&
+      //   trade.stop_loss !== 0 // prevent repeated updates
+      // ) {
+      //   console.log(`🎯 ${symboltoken} profit reached ₹${trade.profit_loss}, trailing SL to ₹0`);
+      //   updateTrade(symboltoken, { stop_loss: 1 });
+      // }
     }
   } catch (err) {
     console.error("❌ [TradeManager] Tick processing error:", err.message);

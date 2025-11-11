@@ -117,7 +117,11 @@ function handleOrderUpdate(order) {
         updates.trade_status = status;
       }
     } else {
-      updates.trade_status = status;
+      if (txnType === "SELL") {
+        console.log("trigger pending");
+      } else {
+        updates.trade_status = status;
+      }
     }
 
     updateTrade(symboltoken, updates);

@@ -1,24 +1,32 @@
 [
   {
-    "tradingsymbol": "NIFTY11NOV2525450PE",
-    "symboltoken": "40094",
-    "exchange": "NFO",
-    "orderid": "251107000520505",
+    "tradingsymbol": "YESBANK-EQ",
+    "symboltoken": "11915",
+    "exchange": "NSE",
+    "orderid": "251111001074017",
     "transactiontype": "BUY",
     "producttype": "INTRADAY",
     "variety": "NORMAL",
     "duration": "DAY",
-    "quantity": "150",
-    "buy_price": 66,
-    "last_traded_price": 65.85,
-    "profit_loss": -360,
-    "highest_profit": 142.5,
+    "quantity": "1",
+    "buy_price": 22.59,
+    "last_traded_price": 22.62,
+    "profit_loss": 0.01,
+    "highest_profit": 0.02,
     "limit_sell_price": null,
     "stop_loss": 800,
     "trail": "50%",
     "trade_status": "closed",
-    "createdAt": "2025-11-07T07:25:36.149Z",
-    "updatedAt": "2025-11-07T07:48:18.791Z",
-    "sell_price": 63.6
+    "createdAt": "2025-11-11T08:57:24.649Z",
+    "updatedAt": "2025-11-11T09:02:29.196Z",
+    "currentOrder": [
+      {
+        "orderid": "251111001074017",
+        "transactiontype": "BUY",
+        "price": 0,
+        "quantity": 1
+      }
+    ],
+    "sell_price": 22.6
   }
 ]

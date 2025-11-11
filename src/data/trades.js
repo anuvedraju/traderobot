@@ -15,18 +15,23 @@ let lastEmit = 0;
  * Add a new trade and subscribe to its token feed.
  */
 function addTrade(order = {}) {
-  const { symboltoken, tradingsymbol } = order;
+  const { symboltoken, tradingsymbol, transactiontype } = order;
+
   if (!symboltoken || !tradingsymbol) {
     console.error("❌ Missing symboltoken/tradingsymbol:", order);
     return null;
   }
 
-  const trade = {
+  const token = symboltoken.toString();
+  const type = transactiontype?.toUpperCase() || "";
+
+  // ✅ Common structure for every trade/order
+  const tradeData = {
     tradingsymbol,
-    symboltoken: symboltoken.toString(),
+    symboltoken: token,
     exchange: order.exchange || "NSE",
     orderid: order.orderid || null,
-    transactiontype: order.transactiontype || "",
+    transactiontype: type,
     producttype: order.producttype || "INTRADAY",
     variety: order.variety || "NORMAL",
     duration: order.duration || "DAY",
@@ -41,15 +46,51 @@ function addTrade(order = {}) {
     trade_status: order.trade_status || "pending",
     createdAt: new Date(),
     updatedAt: new Date(),
+    currentOrder: [
+      {
+        orderid: order.orderid,
+        transactiontype: type,
+        price: order.buy_price || order.price || 0,
+        quantity: order.quantity || 1,
+      },
+    ],
   };
 
-  trades.push(trade);
-  console.log(`✅ Trade added: ${trade.tradingsymbol} (${trade.symboltoken})`);
+  // 🔍 Case 1: SELL order and a running BUY trade exists
+  if (type === "SELL") {
+    const runningTrade = trades.find(
+      (t) => t.symboltoken === token && t.trade_status === "running"
+    );
 
+    if (runningTrade) {
+      console.log("running trade")
+      // ✅ Just update existing trade (don’t add new)
+      runningTrade.currentOrder.push({
+        orderid: order.orderid,
+        transactiontype: "SELL",
+        price: order.sell_price || order.price || 0,
+        quantity: order.quantity || 1,
+      });
+
+      runningTrade.updatedAt = new Date();
+
+      console.log(`🔁 Updated running trade for SELL: ${tradingsymbol}`);
+      emitTrade(runningTrade);
+      scheduleSave();
+      return runningTrade;
+    }
+  }
+
+  // 🔍 Case 2: BUY order or no running trade found
+  trades.push(tradeData);
+  console.log(`✅ Trade added: ${tradingsymbol} (${token})`);
+
+  // Subscribe only for new trades
+  subscribeTokens(token, tradeData.exchange);
   scheduleSave();
-  subscribeTokens(trade.symboltoken, trade.exchange);
-  emitTrade(trade);
-  return trade;
+  emitTrade(tradeData);
+
+  return tradeData;
 }
 
 /**
@@ -84,7 +125,7 @@ function updatePnL(symboltoken, ltp) {
       t.highest_profit = Math.max(t.highest_profit || 0, t.profit_loss);
     }
     t.updatedAt = new Date();
-    console.debug("profit_updtaed",t.last_traded_price,t.profit_loss)
+    console.debug("profit_updtaed", t.last_traded_price, t.profit_loss);
     emitTrade(t);
   });
 

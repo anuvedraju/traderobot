@@ -49,7 +49,7 @@ function handleTick(tick) {
 
     const ltp = parseFloat(ltpRaw) / 100;
     if (!ltp || ltp <= 0) return;
-
+    const updates = {};
     // --- Update trade PnL ---
     updatePnL(symboltoken, ltp);
 
@@ -67,6 +67,8 @@ function handleTick(tick) {
 
       if (trade.trade_status === "running" && loss <= -stopLoss) {
         console.log(`🚨 ${symboltoken} hit stop-loss ₹${loss}, closing...`);
+        updates.trade_status = "closing"
+        updateTrade(symboltoken, updates);
         closeTrade(symboltoken);
       }
       // if (
@@ -107,18 +109,48 @@ function handleOrderUpdate(order) {
         updates.quantity = order.quantity || 0;
       } else if (txnType === "SELL") {
         updates.trade_status = "closed";
+        updates.stop_loss = 10;
         updates.sell_price = order.averageprice || 0;
         setPnL(symboltoken, order.averageprice);
       }
     } else if (["cancelled", "rejected"].includes(status)) {
       if (txnType === "SELL") {
-        console.log("orderRejected or cancelled");
+        console.log(`⚠️ SELL order ${status} — skipping close.`);
       } else {
         updates.trade_status = status;
       }
     } else {
       if (txnType === "SELL") {
-        console.log("trigger pending");
+        console.log(
+          `🕒 SELL order pending (${status}) — adding to currentOrder...`
+        );
+
+        // 🔍 Find the existing running trade for this token
+        const runningTrade = getActiveTrades().find(
+          (t) => t.symboltoken === symboltoken && t.trade_status === "running"
+        );
+
+        if (runningTrade) {
+          // ✅ Replace or update currentOrder for this trade
+          runningTrade.currentOrder = [
+            {
+              orderid: order.orderid,
+              transactiontype: "SELL",
+              price: order.price || 0,
+              quantity: order.quantity || 1,
+              status: status,
+              triggerprice: order.triggerprice || 0,
+              updatetime: order.updatetime || new Date().toISOString(),
+            },
+          ];
+
+          runningTrade.updatedAt = new Date();
+          console.log(`✅ Updated currentOrder for ${symboltoken} (${status})`);
+        } else {
+          console.warn(
+            `⚠️ No running trade found for SELL ${symboltoken}, storing as pending.`
+          );
+        }
       } else {
         updates.trade_status = status;
       }

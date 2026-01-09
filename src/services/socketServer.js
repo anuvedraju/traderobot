@@ -8,6 +8,7 @@ const {
 } = require("../services/angelFeed");
 
 const { getTrades, updateTrade, tradeEmitter } = require("../data/trades");
+const { closeTrade } = require("../functions");
 
 /**
  * Initializes the Socket.IO server and manages client subscriptions, feed updates,
@@ -78,31 +79,46 @@ function initSocketServer(httpServer) {
     // ==============================
     // ✏️ TRADE UPDATE HANDLER (from frontend)
     // ==============================
-    socket.on("updateTrade", (data = {}) => {
+    socket.on("updateTrade", async (data = {}) => {
       try {
-        const { token, updates } = data;
-        if (
-          !token ||
-          typeof updates !== "object" ||
-          !Object.keys(updates).length
-        )
+        const { token, type } = data;
+        if (!token || !type)
           return console.warn("⚠️ Invalid updateTrade payload:", data);
-
+    
         const tokenStr = token.toString().trim();
-        console.log(
-          `📝 Frontend requested trade update → ${tokenStr}`,
-          updates
-        );
-
-        updateTrade(tokenStr, updates);
-
-        // Emit updated trade to all clients watching this token
-        io.to(tokenStr).emit("tradeUpdated", { token: tokenStr, updates });
+        console.log(`📝 Frontend requested action → ${tokenStr}`, type);
+    
+        switch (type) {
+          case "10":
+            console.log("➡️ Setting stop-loss = 10");
+            updateTrade(tokenStr, { stop_loss: 10 });
+            break;
+    
+          case "20":
+            console.log("➡️ Setting stop-loss = 20");
+            updateTrade(tokenStr, { stop_loss: 20 });
+            break;
+    
+          case "M":  // Market close
+            console.log("➡️ Closing trade at MARKET");
+            await closeTrade(tokenStr);
+            break;
+    
+          default:
+            console.warn("⚠️ Unknown action type:", type);
+            return;
+        }
+    
+        // Emit updated trade to frontend
+        io.to(tokenStr).emit("tradeUpdated", {
+          token: tokenStr,
+          type,
+        });
+    
       } catch (err) {
         console.error("❌ Failed to process trade update:", err.message);
       }
     });
-
     // ==============================
     // 🛰️ STATUS + CLEANUP
     // ==============================

@@ -58,13 +58,15 @@ function addTrade(order = {}) {
 
   // 🔍 Case 1: SELL order and a running BUY trade exists
   if (type === "SELL") {
-    console.log("type SELL")
+    console.log("type SELL");
     const runningTrade = trades.find(
       (t) => t.symboltoken === token && t.trade_status === "running"
     );
     if (runningTrade) {
-      console.log(`🔁 Running trade found for ${tradingsymbol}, replacing currentOrder...`);
-    
+      console.log(
+        `🔁 Running trade found for ${tradingsymbol}, replacing currentOrder...`
+      );
+
       // ✅ Replace the existing currentOrder array entirely with the new SELL order
       runningTrade.currentOrder = [
         {
@@ -74,21 +76,25 @@ function addTrade(order = {}) {
           quantity: order.quantity || 1,
         },
       ];
-    
+
       // Optional: update trade status to indicate it’s closing
       runningTrade.updatedAt = new Date();
-    
+
       // Emit updated trade to frontend and persist
       emitTrade(runningTrade);
       scheduleSave();
-    
-      console.log(`✅ Replaced currentOrder for running trade: ${tradingsymbol}`);
+
+      console.log(
+        `✅ Replaced currentOrder for running trade: ${tradingsymbol}`
+      );
       return runningTrade;
     }
+  } else {
+    trades.push(tradeData);
   }
 
   // 🔍 Case 2: BUY order or no running trade found
-  trades.push(tradeData);
+
   console.log(`✅ Trade added: ${tradingsymbol} (${token})`);
 
   // Subscribe only for new trades

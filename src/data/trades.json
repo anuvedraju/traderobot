@@ -1,131 +1,38 @@
 [
   {
-    "tradingsymbol": "YESBANK-EQ",
-    "symboltoken": "11915",
-    "exchange": "NSE",
-    "orderid": "251128000013919",
+    "tradingsymbol": "NIFTY13JAN2625600CE",
+    "symboltoken": "46151",
+    "exchange": "NFO",
+    "orderid": "260109000760554",
     "transactiontype": "BUY",
     "producttype": "INTRADAY",
     "variety": "NORMAL",
     "duration": "DAY",
-    "quantity": "1",
-    "buy_price": 22.81,
-    "last_traded_price": 22.86,
-    "profit_loss": 0.01,
-    "highest_profit": 0.03,
+    "quantity": "130",
+    "buy_price": 152.45,
+    "last_traded_price": 163.45,
+    "profit_loss": 988,
+    "highest_profit": 490.75,
     "limit_sell_price": null,
     "stop_loss": 10,
     "trail": "50%",
     "trade_status": "closed",
-    "createdAt": "2025-11-28T03:45:13.026Z",
-    "updatedAt": "2025-11-28T08:53:23.808Z",
+    "createdAt": "2026-01-09T09:15:25.563Z",
+    "updatedAt": "2026-01-09T09:40:26.097Z",
     "currentOrder": [
       {
-        "orderid": "251128000019131",
+        "orderid": "260109000762603",
         "transactiontype": "SELL",
-        "price": 22.73,
-        "quantity": "1",
+        "price": 144.9,
+        "quantity": "130",
         "status": "open",
-        "triggerprice": 0,
-        "updatetime": "28-Nov-2025 09:16:04"
+        "triggerprice": 145,
+        "updatetime": "09-Jan-2026 14:46:24"
       }
     ],
-    "sell_price": 22.82
-  },
-  {
-    "tradingsymbol": "PAYTM30DEC251340CE",
-    "symboltoken": "127301",
-    "exchange": "NFO",
-    "orderid": "251128000032018",
-    "transactiontype": "BUY",
-    "producttype": "INTRADAY",
-    "variety": "NORMAL",
-    "duration": "DAY",
-    "quantity": 725,
-    "buy_price": 0,
-    "last_traded_price": 45.45,
-    "profit_loss": 0,
-    "highest_profit": 0,
-    "limit_sell_price": null,
-    "stop_loss": 800,
-    "trail": "50%",
-    "trade_status": "rejected",
-    "createdAt": "2025-11-28T03:48:46.557Z",
-    "updatedAt": "2025-11-28T08:08:05.653Z",
-    "currentOrder": [
-      {
-        "orderid": "251128000032018",
-        "transactiontype": "BUY",
-        "price": 0,
-        "quantity": 725
-      }
-    ]
-  },
-  {
-    "tradingsymbol": "VBL30DEC25480CE",
-    "symboltoken": "149980",
-    "exchange": "NFO",
-    "orderid": "251128000115418",
-    "transactiontype": "BUY",
-    "producttype": "INTRADAY",
-    "variety": "NORMAL",
-    "duration": "DAY",
-    "quantity": "1025",
-    "buy_price": 17.1,
-    "last_traded_price": 16.4,
-    "profit_loss": -102.5,
-    "highest_profit": 1230,
-    "limit_sell_price": null,
-    "stop_loss": 10,
-    "trail": "50%",
-    "trade_status": "closed",
-    "createdAt": "2025-11-28T04:11:01.121Z",
-    "updatedAt": "2025-11-28T08:08:05.654Z",
-    "currentOrder": [
-      {
-        "orderid": "251128000115418",
-        "transactiontype": "BUY",
-        "price": 0,
-        "quantity": 1025
-      }
-    ],
-    "target": 1500,
+    "sell_price": 160.05,
     "exit_price": "MARKET",
-    "exit_time": "2025-11-28T04:13:25.801Z",
-    "exit_order_id": "251128000123653",
-    "sell_price": 17
-  },
-  {
-    "tradingsymbol": "ADANIENT30DEC252300CE",
-    "symboltoken": "55848",
-    "exchange": "NFO",
-    "orderid": "251128000173101",
-    "transactiontype": "BUY",
-    "producttype": "INTRADAY",
-    "variety": "NORMAL",
-    "duration": "DAY",
-    "quantity": "309",
-    "buy_price": 86.4,
-    "last_traded_price": 81.8,
-    "profit_loss": -849.75,
-    "highest_profit": 0,
-    "limit_sell_price": null,
-    "stop_loss": 10,
-    "trail": "50%",
-    "trade_status": "closed",
-    "createdAt": "2025-11-28T04:32:10.927Z",
-    "updatedAt": "2025-11-28T08:08:05.657Z",
-    "currentOrder": [
-      {
-        "orderid": "251128000173101",
-        "transactiontype": "BUY",
-        "price": 0,
-        "quantity": 309
-      }
-    ],
-    "exit_price": "MARKET",
-    "exit_time": "2025-11-28T04:32:40.531Z",
-    "exit_order_id": "251128000175801",
-    "sell_price": 83.65
+    "exit_time": "2026-01-09T09:28:33.470Z",
+    "exit_order_id": "260109000781553"
   }
 ]

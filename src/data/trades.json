@@ -10,7 +10,7 @@
     "duration": "DAY",
     "quantity": "1",
     "buy_price": 21.08,
-    "last_traded_price": 21.12,
+    "last_traded_price": 21.13,
     "profit_loss": -0.01,
     "highest_profit": 0,
     "limit_sell_price": null,
@@ -18,7 +18,7 @@
     "trail": "50%",
     "trade_status": "closed",
     "createdAt": "2026-02-12T07:54:30.954Z",
-    "updatedAt": "2026-02-12T08:20:04.666Z",
+    "updatedAt": "2026-02-12T08:21:39.080Z",
     "currentOrder": [
       {
         "orderid": "260212000660383",

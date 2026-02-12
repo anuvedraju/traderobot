@@ -1,38 +1,35 @@
 [
   {
-    "tradingsymbol": "NIFTY13JAN2625600CE",
-    "symboltoken": "46151",
-    "exchange": "NFO",
-    "orderid": "260109000760554",
+    "tradingsymbol": "YESBANK-EQ",
+    "symboltoken": "11915",
+    "exchange": "NSE",
+    "orderid": "260212000660383",
     "transactiontype": "BUY",
     "producttype": "INTRADAY",
     "variety": "NORMAL",
     "duration": "DAY",
-    "quantity": "130",
-    "buy_price": 152.45,
-    "last_traded_price": 163.45,
-    "profit_loss": 988,
-    "highest_profit": 490.75,
+    "quantity": "1",
+    "buy_price": 21.08,
+    "last_traded_price": 21.12,
+    "profit_loss": -0.01,
+    "highest_profit": 0,
     "limit_sell_price": null,
     "stop_loss": 10,
     "trail": "50%",
     "trade_status": "closed",
-    "createdAt": "2026-01-09T09:15:25.563Z",
-    "updatedAt": "2026-01-09T09:40:26.097Z",
+    "createdAt": "2026-02-12T07:54:30.954Z",
+    "updatedAt": "2026-02-12T08:11:15.828Z",
     "currentOrder": [
       {
-        "orderid": "260109000762603",
-        "transactiontype": "SELL",
-        "price": 144.9,
-        "quantity": "130",
-        "status": "open",
-        "triggerprice": 145,
-        "updatetime": "09-Jan-2026 14:46:24"
+        "orderid": "260212000660383",
+        "transactiontype": "BUY",
+        "price": 0,
+        "quantity": 1
       }
     ],
-    "sell_price": 160.05,
     "exit_price": "MARKET",
-    "exit_time": "2026-01-09T09:28:33.470Z",
-    "exit_order_id": "260109000781553"
+    "exit_time": "2026-02-12T07:54:50.581Z",
+    "exit_order_id": "260212000661445",
+    "sell_price": 21.07
   }
 ]

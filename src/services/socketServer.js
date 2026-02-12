@@ -94,9 +94,19 @@ function initSocketServer(httpServer) {
             updateTrade(tokenStr, { stop_loss: 10 });
             break;
     
-          case "20":
-            console.log("➡️ Setting stop-loss = 20");
-            updateTrade(tokenStr, { stop_loss: 20 });
+          case "450":
+            console.log("➡️ Setting stop-loss = 450");
+            updateTrade(tokenStr, { stop_loss: 450 });
+            break;
+
+          case "50%":
+            console.log("➡️ Setting target = 50");
+            updateTrade(tokenStr, { target: 50 });
+            break;
+
+          case "70%":
+            console.log("➡️ Setting target = 70");
+            updateTrade(tokenStr, { target: 70 });
             break;
     
           case "M":  // Market close

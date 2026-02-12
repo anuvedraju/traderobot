@@ -15,20 +15,20 @@ const { closeTrade } = require("./functions");
 function initTradeManager() {
   console.log("🧠 Trade Manager initialized...");
 
-  // --- Handle live ticks ---
   feedEmitter.on("tick", handleTick);
-  // --- Handle order updates ---
   feedEmitter.on("orderUpdate", handleOrderUpdate);
 
   console.log("📡 Trade Manager subscribed to feedEmitter ✅");
 }
 
 /**
- * Handle tick updates: update PnL, manage stop-loss logic.
+ * Handle tick updates: update PnL, manage SL & trailing logic.
  */
 function handleTick(tick) {
   try {
-    // --- Normalize symboltoken ---
+    // ─────────────────────────────────────────────
+    // Normalize symboltoken
+    // ─────────────────────────────────────────────
     let symboltoken =
       tick.symboltoken ||
       tick.token ||
@@ -40,53 +40,110 @@ function handleTick(tick) {
       ?.toString()
       .replace(/['"\s]+/g, "")
       .trim();
-
     if (!symboltoken) return;
 
-    // --- Normalize LTP ---
+    // ─────────────────────────────────────────────
+    // Normalize LTP
+    // ─────────────────────────────────────────────
     const ltpRaw = tick.ltp ?? tick.last_traded_price;
     if (!ltpRaw || isNaN(ltpRaw)) return;
 
     const ltp = parseFloat(ltpRaw) / 100;
-    if (!ltp || ltp <= 0) return;
-    const updates = {};
-    // --- Update trade PnL ---
+    if (ltp <= 0) return;
+
+    // ─────────────────────────────────────────────
+    // Update PnL
+    // ─────────────────────────────────────────────
     updatePnL(symboltoken, ltp);
 
-    // --- Check stop-loss condition for this symbol ---
-    const activeTrades = getActiveTrades();
-
-    // Find only the matching trades to minimize loop overhead
-    const symbolTrades = activeTrades.filter(
-      (t) => t.symboltoken?.toString() === symboltoken.toString()
+    // ─────────────────────────────────────────────
+    // Process active trades for this symbol
+    // ─────────────────────────────────────────────
+    const symbolTrades = getActiveTrades().filter(
+      (t) => t.symboltoken?.toString() === symboltoken,
     );
 
     for (const trade of symbolTrades) {
+      if (trade.trade_status !== "running") continue;
+
+      // ─────────────────────────────────────────────
+      // Update highest profit
+      // ─────────────────────────────────────────────
+      if (trade.profit_loss > (trade.highest_profit || 0)) {
+        updateTrade(symboltoken, {
+          highest_profit: trade.profit_loss,
+        });
+      }
+
+      // ─────────────────────────────────────────────
+      // Stop-loss logic
+      // ─────────────────────────────────────────────
       const loss = Number(trade.profit_loss || 0);
       const stopLoss = Number(trade.stop_loss || 800);
 
-      if (trade.trade_status === "running" && loss <= -stopLoss) {
-        console.log(`🚨 ${symboltoken} hit stop-loss ₹${loss}, closing...`);
-        updates.trade_status = "closing"
-        updateTrade(symboltoken, updates);
+      if (loss <= -stopLoss) {
+        console.log(`🚨 ${symboltoken} hit stop-loss | PnL: ₹${loss}`);
+
+        updateTrade(symboltoken, { trade_status: "closing" });
         closeTrade(symboltoken);
+        continue;
       }
-      // if (
-      //   trade.trade_status === "running" &&
-      //   trade.profit_loss >= 0.02 &&
-      //   trade.stop_loss !== 0 // prevent repeated updates
-      // ) {
-      //   console.log(`🎯 ${symboltoken} profit reached ₹${trade.profit_loss}, trailing SL to ₹0`);
-      //   updateTrade(symboltoken, { stop_loss: 1 });
-      // }
+      if (trade.highest_profit > stopLoss) {
+        console.log(`🚨 ${symboltoken} hit stop-loss | PnL: ₹${loss}`);
+
+        updateTrade(symboltoken, { stop_loss: 10 });
+      }
+
+      // ─────────────────────────────────────────────
+      // Trailing target logic
+      // ─────────────────────────────────────────────
+      handleTrailingTarget({
+        trade,
+        symboltoken,
+      });
     }
   } catch (err) {
-    console.error("❌ [TradeManager] Tick processing error:", err.message);
+    console.error("❌ [TradeManager] Tick error:", err.message);
   }
 }
 
 /**
- * Handle order updates: sync trade states with SmartAPI order feed.
+ * Percentage-based trailing profit booking
+ */
+function handleTrailingTarget({ trade, symboltoken }) {
+  if (!trade) return;
+  if (trade.trade_status !== "running") return;
+  if (trade.target == null) return;
+  if (trade.highest_profit <= 0) return;
+
+  // Optional noise filter
+  // if (trade.highest_profit < 500) return;
+
+  const normalize = (v) => Math.round(v * 100) / 100;
+
+  const targetPercent = Number(trade.target);
+  if (Number.isNaN(targetPercent) || targetPercent <= 0) return;
+
+  const targetPrice = normalize((trade.highest_profit * targetPercent) / 100);
+  updateTrade(symboltoken, { target_Price: targetPrice });
+
+  const currentProfit = normalize(trade.profit_loss);
+
+  if (currentProfit > targetPrice) return;
+
+  console.log(
+    `🎯 Trailing target hit | ${symboltoken} | ` +
+      `Highest: ₹${trade.highest_profit}, ` +
+      `Current: ₹${currentProfit}, ` +
+      `Target (${targetPercent}%): ₹${targetPrice}`,
+  );
+
+  updateTrade(symboltoken, { trade_status: "closing" });
+  closeTrade(symboltoken);
+}
+
+/**
+ * Handle order updates from broker
  */
 function handleOrderUpdate(order) {
   try {
@@ -107,6 +164,9 @@ function handleOrderUpdate(order) {
         updates.trade_status = "running";
         updates.buy_price = order.averageprice || 0;
         updates.quantity = order.quantity || 0;
+        if (order.producttype) updates.producttype = order.producttype;
+        if (order.variety) updates.variety = order.variety;
+        if (order.duration) updates.duration = order.duration;
       } else if (txnType === "SELL") {
         updates.trade_status = "closed";
         updates.stop_loss = 10;
@@ -118,16 +178,17 @@ function handleOrderUpdate(order) {
         console.log(`⚠️ SELL order ${status} — skipping close.`);
       } else {
         updates.trade_status = status;
+        console.log(`⚠️ CANCELL order ${status} — skipping close.`);
       }
     } else {
       if (txnType === "SELL") {
         console.log(
-          `🕒 SELL order pending (${status}) — adding to currentOrder...`
+          `🕒 SELL order pending (${status}) — adding to currentOrder...`,
         );
 
         // 🔍 Find the existing running trade for this token
         const runningTrade = getActiveTrades().find(
-          (t) => t.symboltoken === symboltoken && t.trade_status === "running"
+          (t) => t.symboltoken === symboltoken && t.trade_status === "running",
         );
 
         if (runningTrade) {
@@ -148,7 +209,7 @@ function handleOrderUpdate(order) {
           console.log(`✅ Updated currentOrder for ${symboltoken} (${status})`);
         } else {
           console.warn(
-            `⚠️ No running trade found for SELL ${symboltoken}, storing as pending.`
+            `⚠️ No running trade found for SELL ${symboltoken}, storing as pending.`,
           );
         }
       } else {
@@ -160,7 +221,7 @@ function handleOrderUpdate(order) {
 
     if (updates.trade_status)
       console.log(
-        `✅ ${symboltoken} trade → ${updates.trade_status.toUpperCase()}`
+        `✅ ${symboltoken} trade → ${updates.trade_status.toUpperCase()}`,
       );
 
     // Optional: keep this for debugging

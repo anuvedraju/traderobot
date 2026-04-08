@@ -13,6 +13,10 @@ function isMarketHours() {
   const m = getISTMinutes();
   return m >= (9 * 60 + 15) && m <= (16 * 60 + 30);
 }
+
+function isAfterMarketClose() {
+  return getISTMinutes() > (16 * 60 + 30);
+}
 const http = require("http");
 const dotenv = require("dotenv");
 
@@ -80,6 +84,25 @@ async function startServer() {
     });
 
     console.log("🧠 Traderobot backend fully initialized ✅");
+
+    // 🛑 AUTO STOP AFTER MARKET CLOSE
+    setInterval(() => {
+      if (isAfterMarketClose()) {
+        console.log("🛑 Market closed. Clearing session & exiting.");
+
+        // 🧹 CLEAR SESSION DATA HERE
+        // reset trade manager
+        // close feeds
+        // write EOD logs
+
+        server.close(() => {
+          console.log("✅ Cleanup done. Exiting.");
+          process.exit(0);
+        });
+
+        setTimeout(() => process.exit(0), 5000);
+      }
+    }, 60 * 1000);
 
   } catch (err) {
     console.error("❌ Server failed to start:", err.message || err);

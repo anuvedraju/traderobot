@@ -41,6 +41,7 @@ async function startServer() {
     server.listen(PORT, () =>
       console.log(`🚀 Traderobot running on port ${PORT}`)
     );
+    
     const io = initSocketServer(server);
 
     server.on("error", (err) => {
@@ -109,5 +110,8 @@ async function startServer() {
     process.exit(1);
   }
 }
+app.get('/', (req, res) => {
+  res.send('🚀 Traderobot backend is running!');
+});
 
 startServer();

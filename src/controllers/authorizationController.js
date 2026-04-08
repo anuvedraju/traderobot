@@ -52,11 +52,12 @@ async function autoLogin() {
     const profile = await smartApi.getProfile();
     console.log("✅ Angel One login successful!");
     console.log("👤 Profile Data:", profile.data);
-    setSessionStatus(true)
+    setSessionStatus(true);
     return data;
   } catch (err) {
     console.error("❌ Angel One auto-login failed:", err.message || err);
-    setSessionStatus(false)
+    setSessionStatus(false);
+    throw err;
   }
 }
 

@@ -30,6 +30,42 @@ async function closeTrade(symbol) {
 
     const smartApi = getSmartApi();
     const txnType = "SELL";
+    const currentOrders = Array.isArray(trade.currentOrder)
+      ? trade.currentOrder
+      : Array.isArray(trade.currentorder)
+        ? trade.currentorder
+        : [];
+
+    const existingSellOrder = currentOrders.find((order) => {
+      const orderTxnType = order?.transactiontype?.toUpperCase?.();
+      const orderStatus = order?.status?.toLowerCase?.();
+
+      return (
+        orderTxnType === "SELL" &&
+        order?.orderid &&
+        !["complete", "cancelled", "rejected"].includes(orderStatus)
+      );
+    });
+
+    if (existingSellOrder) {
+      const cancelParams = {
+        orderid: existingSellOrder.orderid,
+        variety: trade.variety || "NORMAL",
+      };
+
+      console.log(
+        `🛑 Cancelling existing SELL order for ${symbol}...`,
+        cancelParams,
+      );
+
+      await smartApi.cancelOrder(cancelParams);
+
+      updateTrade(symbol, {
+        currentOrder: currentOrders.filter(
+          (order) => order?.orderid !== existingSellOrder.orderid,
+        ),
+      });
+    }
 
     const orderParams = {
       variety: "NORMAL",

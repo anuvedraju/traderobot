@@ -88,10 +88,12 @@ function handleTick(tick) {
         closeTrade(symboltoken);
         continue;
       }
-      if (trade.highest_profit > stopLoss) {
-        console.log(`🚨 ${symboltoken} hit stop-loss | PnL: ₹${loss}`);
-
+      if (trade.highest_profit > 1200 && stopLoss !== 10) {
+        console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
+        closeTrade(symboltoken);
         updateTrade(symboltoken, { stop_loss: 10 });
+        // updateTrade(tokenStr, { target: 50 });
+
       }
 
       // ─────────────────────────────────────────────
@@ -169,7 +171,7 @@ function handleOrderUpdate(order) {
         if (order.duration) updates.duration = order.duration;
       } else if (txnType === "SELL") {
         updates.trade_status = "closed";
-        updates.stop_loss = 10;
+        // updates.stop_loss = 10;
         updates.sell_price = order.averageprice || 0;
         setPnL(symboltoken, order.averageprice);
       }

@@ -1,2 +1,2 @@
-command 
-# nohup ./guardian.sh > trade.log 2>&1 &
+command
+# nohup node server.js > trade.log 2>&1 &

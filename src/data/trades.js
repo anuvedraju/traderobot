@@ -137,7 +137,6 @@ function updatePnL(symboltoken, ltp) {
       t.highest_profit = Math.max(t.highest_profit || 0, t.profit_loss);
     }
     t.updatedAt = new Date();
-    console.debug("profit_updtaed", t.last_traded_price, t.profit_loss);
     emitTrade(t);
   });
 

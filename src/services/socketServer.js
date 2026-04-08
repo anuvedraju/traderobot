@@ -138,7 +138,7 @@ function initSocketServer(httpServer) {
       console.log(`❌ Disconnected → ${socket.id} (${reason})`);
 
       // Cleanup unsubscribed rooms
-      for (const tokenStr of activeSubscriptions) {
+      for (const tokenStr of [...activeSubscriptions]) {
         const clientsInRoom = io.sockets.adapter.rooms.get(tokenStr);
         if (!clientsInRoom || clientsInRoom.size === 0) {
           unsubscribeTokens(tokenStr);

@@ -13,6 +13,8 @@ let isFeedConnected = false;
 let isSessionActive = false;
 let reconnectTimer = null;
 let listenersAttached = false;
+let heartbeatTimer = null;
+let orderReconnectTimer = null;
 
 const exchangeMap = { NSE: 1, NFO: 2, BSE: 3, BFO: 4, MCX: 5 };
 
@@ -89,7 +91,25 @@ function attachMarketListeners(jwtToken, feedToken) {
  * wss://tns.angelone.in/smart-order-update
  */
 function initOrderStatusFeed(jwtToken) {
+  if (!process.env.ORDER_FEED_URL) {
+    console.warn("⚠️ ORDER_FEED_URL missing, skipping order status feed.");
+    return;
+  }
 
+  if (orderReconnectTimer) {
+    clearTimeout(orderReconnectTimer);
+    orderReconnectTimer = null;
+  }
+
+  if (orderWS) {
+    try {
+      orderWS.removeAllListeners();
+      orderWS.terminate();
+    } catch (err) {
+      console.warn("⚠️ Failed to reset previous order feed socket:", err.message);
+    }
+    orderWS = null;
+  }
 
   console.log("📦 Connecting to Order Status Feed...");
   orderWS = new WebSocket(process.env.ORDER_FEED_URL, {
@@ -120,7 +140,7 @@ function initOrderStatusFeed(jwtToken) {
       };
       order.status = statusMap[code] || "unknown";
       feedEmitter.emit("orderUpdate", order);
-      console.log("order",order)
+      console.log("order", order);
     } catch (err) {
       console.error("⚠️ Error parsing order message:", err.message);
     }
@@ -128,7 +148,11 @@ function initOrderStatusFeed(jwtToken) {
 
   orderWS.on("close", () => {
     console.warn("🧱 Order feed closed — reconnecting in 10s...");
-    setTimeout(() => initOrderStatusFeed(jwtToken), 10000);
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+    orderReconnectTimer = setTimeout(() => initOrderStatusFeed(jwtToken), 10000);
   });
 
   orderWS.on("error", (err) => {
@@ -140,7 +164,8 @@ function initOrderStatusFeed(jwtToken) {
  * Send periodic ping to keep WS alive
  */
 function startHeartbeat() {
-  setInterval(() => {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => {
     if (orderWS?.readyState === WebSocket.OPEN) {
       orderWS.send("ping");
     }

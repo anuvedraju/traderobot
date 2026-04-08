@@ -110,8 +110,5 @@ async function startServer() {
     process.exit(1);
   }
 }
-app.get('/', (req, res) => {
-  res.send('🚀 Traderobot backend is running!');
-});
 
 startServer();

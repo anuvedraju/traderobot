@@ -1,7 +1,14 @@
 const express = require("express");
 const router = express.Router();
-const { loginSmartAPI } = require("../controllers/authorizationController");
+const {
+  getFrontendAuthConfig,
+  loginSmartAPI,
+} = require("../controllers/authorizationController");
+const {
+  requireFrontendApiKey,
+} = require("../middleware/requireFrontendApiKey");
 
-router.post("/login", loginSmartAPI);
+router.get("/config", getFrontendAuthConfig);
+router.post("/login", requireFrontendApiKey, loginSmartAPI);
 
 module.exports = router;

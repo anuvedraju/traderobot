@@ -8,6 +8,16 @@ dotenv.config();
 let smartApiInstance = null;
 let sessionData = null;
 
+function getFrontendAuthConfig(req, res) {
+  res.json({
+    success: true,
+    authRequired: true,
+    configured: Boolean(process.env.FRONTEND_API_AUTH_KEY),
+    acceptedHeaders: ["x-api-key", "authorization"],
+    authorizationFormat: "Bearer <FRONTEND_API_AUTH_KEY>",
+  });
+}
+
 // 🔹 Express route: manual login
 async function loginSmartAPI(req, res) {
   try {
@@ -68,6 +78,7 @@ function getSmartApi() {
 }
 
 module.exports = {
+  getFrontendAuthConfig,
   loginSmartAPI,
   autoLogin,
   getSmartApi,

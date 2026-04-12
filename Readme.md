@@ -1,12 +1,6 @@
 command
 # nohup node server.js > trade.log 2>&1 &
 
-frontend api auth
-# set FRONTEND_API_AUTH_KEY in .env
-# send x-api-key: <FRONTEND_API_AUTH_KEY>
-# or Authorization: Bearer <FRONTEND_API_AUTH_KEY>
-# GET /api/auth/config to verify backend auth setup
-
 launch aws terminal
 # chmod 400 /Users/user/Downloads/Trading2.pem
 connect 
@@ -20,3 +14,18 @@ github settings
 
 view trades.json
 # nano ~/traderobot/src/data/trades.json
+
+update the code and get from github.
+# ssh
+# cd traderobot
+# git pull origin main 
+
+get .env
+# nano ~/traderobot/.env
+
+
+get logs for backend
+ # pm2 logs backend
+
+ restart backednd ec2 server
+ # pm2 restart backend

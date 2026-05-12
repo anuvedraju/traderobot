@@ -120,6 +120,50 @@ function updateTrade(identifier, updates = {}) {
   emitTrade(trade);
 }
 
+function isClosedTrade(trade = {}) {
+  const status = (
+    trade.trade_status ||
+    trade.status ||
+    trade.orderstatus ||
+    ""
+  )
+    .toString()
+    .toLowerCase();
+
+  return status === "closed";
+}
+
+function deleteClosedTradesBySymbolToken(symboltoken) {
+  if (!symboltoken) {
+    return { deleted: 0, found: false, hasOpenTrade: false };
+  }
+
+  const token = symboltoken.toString().trim();
+  const matchingTrades = trades.filter((t) => t.symboltoken?.toString() === token);
+  const closedTrades = matchingTrades.filter(isClosedTrade);
+
+  if (!closedTrades.length) {
+    return {
+      deleted: 0,
+      found: matchingTrades.length > 0,
+      hasOpenTrade: matchingTrades.some((t) => !isClosedTrade(t)),
+    };
+  }
+
+  trades = trades.filter(
+    (t) => !(t.symboltoken?.toString() === token && isClosedTrade(t))
+  );
+
+  saveToFile();
+  tradeEmitter.emit("tradeDeleted", { symboltoken: token });
+
+  return {
+    deleted: closedTrades.length,
+    found: true,
+    hasOpenTrade: matchingTrades.length > closedTrades.length,
+  };
+}
+
 /**
  * Update profit/loss for all trades with given token.
  */
@@ -206,6 +250,7 @@ module.exports = {
   getTrades,
   getActiveTrades,
   getTradesBySymbol,
+  deleteClosedTradesBySymbolToken,
   clearTrades,
   tradeEmitter,
 };

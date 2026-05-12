@@ -22,6 +22,18 @@ function initSocketServer(httpServer) {
 
   const activeSubscriptions = new Set();
 
+  const shouldUnsubscribeToken = (tokenStr) => {
+    const clientsInRoom = io.sockets.adapter.rooms.get(tokenStr);
+    const isTradeExisting = getTrades().some(
+      (t) => t.symboltoken?.toString() === tokenStr
+    );
+
+    return {
+      shouldUnsubscribe: (!clientsInRoom || clientsInRoom.size === 0) && !isTradeExisting,
+      isTradeExisting,
+    };
+  };
+
   io.on("connection", (socket) => {
     console.log(
       `⚡ Client connected → ${socket.id} (${io.engine.clientsCount} total)`
@@ -57,13 +69,10 @@ function initSocketServer(httpServer) {
       socket.leave(tokenStr);
       console.log(`📤 ${socket.id} unsubscribed → ${tokenStr}`);
 
-      const clientsInRoom = io.sockets.adapter.rooms.get(tokenStr);
-      const allTrades = getTrades();
-      const isTradeExisting = allTrades.some(
-        (t) => t.symboltoken?.toString() === tokenStr
-      );
+      const { shouldUnsubscribe, isTradeExisting } =
+        shouldUnsubscribeToken(tokenStr);
 
-      if ((!clientsInRoom || clientsInRoom.size === 0) && !isTradeExisting) {
+      if (shouldUnsubscribe) {
         unsubscribeTokens(tokenStr, exchange);
         activeSubscriptions.delete(tokenStr);
         console.log(`🛑 Angel feed unsubscribed for ${tokenStr}`);
@@ -139,11 +148,15 @@ function initSocketServer(httpServer) {
 
       // Cleanup unsubscribed rooms
       for (const tokenStr of [...activeSubscriptions]) {
-        const clientsInRoom = io.sockets.adapter.rooms.get(tokenStr);
-        if (!clientsInRoom || clientsInRoom.size === 0) {
+        const { shouldUnsubscribe, isTradeExisting } =
+          shouldUnsubscribeToken(tokenStr);
+
+        if (shouldUnsubscribe) {
           unsubscribeTokens(tokenStr);
           activeSubscriptions.delete(tokenStr);
           console.log(`🧹 Auto-cleaned subscription → ${tokenStr}`);
+        } else if (isTradeExisting) {
+          console.log(`⚠️ Keeping ${tokenStr} subscribed — trade still exists.`);
         }
       }
     });
@@ -188,6 +201,11 @@ function initSocketServer(httpServer) {
     lastEmitted.set(tokenStr, now);
 
     io.emit("tradeUpdated", trade);
+  });
+
+  tradeEmitter.on("tradeDeleted", ({ symboltoken }) => {
+    if (!symboltoken) return;
+    io.emit("tradeDeleted", { symboltoken: symboltoken.toString() });
   });
 
   console.log("🔌 Socket.IO server ready and bound to feed/trade emitters ✅");

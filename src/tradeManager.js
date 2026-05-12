@@ -4,21 +4,49 @@ const {
   updateTrade,
   updatePnL,
   getActiveTrades,
-  getTrades,
   setPnL,
 } = require("./data/trades");
 const { closeTrade } = require("./functions");
+
+let isInitialized = false;
 
 /**
  * Initialize and manage trade updates from live ticks and orders.
  */
 function initTradeManager() {
+  if (isInitialized) {
+    console.log("🧠 Trade Manager already initialized.");
+    return;
+  }
+
   console.log("🧠 Trade Manager initialized...");
 
   feedEmitter.on("tick", handleTick);
   feedEmitter.on("orderUpdate", handleOrderUpdate);
 
+  isInitialized = true;
   console.log("📡 Trade Manager subscribed to feedEmitter ✅");
+}
+
+function normalizeSymbolToken(value) {
+  return value
+    ?.toString()
+    .replace(/['"\s]+/g, "")
+    .trim();
+}
+
+function normalizeStatus(value) {
+  return value?.toString().toLowerCase();
+}
+
+function normalizeTransactionType(value) {
+  return value?.toString().toUpperCase();
+}
+
+function normalizeLtp(rawLtp) {
+  const value = Number(rawLtp);
+  if (!value) return 0;
+  return value / 100;
 }
 
 /**
@@ -29,26 +57,19 @@ function handleTick(tick) {
     // ─────────────────────────────────────────────
     // Normalize symboltoken
     // ─────────────────────────────────────────────
-    let symboltoken =
+    const symboltoken = normalizeSymbolToken(
       tick.symboltoken ||
       tick.token ||
       tick.Token ||
       tick.symbol ||
-      tick.tradingsymbol;
-
-    symboltoken = symboltoken
-      ?.toString()
-      .replace(/['"\s]+/g, "")
-      .trim();
+      tick.tradingsymbol
+    );
     if (!symboltoken) return;
 
     // ─────────────────────────────────────────────
     // Normalize LTP
     // ─────────────────────────────────────────────
-    const ltpRaw = tick.ltp ?? tick.last_traded_price;
-    if (!ltpRaw || isNaN(ltpRaw)) return;
-
-    const ltp = parseFloat(ltpRaw) / 100;
+    const ltp = normalizeLtp(tick.ltp ?? tick.last_traded_price);
     if (ltp <= 0) return;
 
     // ─────────────────────────────────────────────
@@ -86,14 +107,12 @@ function handleTick(tick) {
 
         updateTrade(symboltoken, { trade_status: "closing" });
         closeTrade(symboltoken);
+        updateTrade(symboltoken, { stop_loss: 10 });
         continue;
       }
-      if (trade.highest_profit > 800 && stopLoss !== 10) {
+      if (trade.highest_profit > 1200 && stopLoss !== 10) {
         console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
-        // closeTrade(symboltoken);ß
         updateTrade(symboltoken, { stop_loss: 10 });
-        // updateTrade(tokenStr, { target: 50 });
-
       }
 
       // ─────────────────────────────────────────────
@@ -151,9 +170,9 @@ function handleOrderUpdate(order) {
   try {
     if (!order) return;
 
-    const symboltoken = order.symboltoken?.toString().trim();
-    const status = order.status?.toLowerCase();
-    const txnType = order.transactiontype?.toUpperCase();
+    const symboltoken = normalizeSymbolToken(order.symboltoken);
+    const status = normalizeStatus(order.status);
+    const txnType = normalizeTransactionType(order.transactiontype);
 
     if (!symboltoken || !status) return;
 
@@ -194,20 +213,19 @@ function handleOrderUpdate(order) {
         );
 
         if (runningTrade) {
-          // ✅ Replace or update currentOrder for this trade
-          runningTrade.currentOrder = [
-            {
-              orderid: order.orderid,
-              transactiontype: "SELL",
-              price: order.price || 0,
-              quantity: order.quantity || 1,
-              status: status,
-              triggerprice: order.triggerprice || 0,
-              updatetime: order.updatetime || new Date().toISOString(),
-            },
-          ];
-
-          runningTrade.updatedAt = new Date();
+          updateTrade(symboltoken, {
+            currentOrder: [
+              {
+                orderid: order.orderid,
+                transactiontype: "SELL",
+                price: order.price || 0,
+                quantity: order.quantity || 1,
+                status,
+                triggerprice: order.triggerprice || 0,
+                updatetime: order.updatetime || new Date().toISOString(),
+              },
+            ],
+          });
           console.log(`✅ Updated currentOrder for ${symboltoken} (${status})`);
         } else {
           console.warn(
@@ -219,7 +237,9 @@ function handleOrderUpdate(order) {
       }
     }
 
-    updateTrade(symboltoken, updates);
+    if (Object.keys(updates).length) {
+      updateTrade(symboltoken, updates);
+    }
 
     if (updates.trade_status)
       console.log(

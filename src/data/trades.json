@@ -1,68 +1,31 @@
 [
   {
-    "tradingsymbol": "NIFTY30MAR2622500PE",
-    "symboltoken": "54479",
-    "exchange": "NFO",
-    "orderid": "260330000631444",
+    "tradingsymbol": "YESBANK-EQ",
+    "symboltoken": "11915",
+    "exchange": "NSE",
+    "orderid": "0511a7660aa2AO",
     "transactiontype": "BUY",
     "producttype": "INTRADAY",
     "variety": "NORMAL",
     "duration": "DAY",
-    "quantity": "130",
-    "buy_price": 50.4,
-    "last_traded_price": 78.5,
-    "profit_loss": 1378,
-    "highest_profit": 1378,
-    "limit_sell_price": null,
-    "stop_loss": 10,
-    "trail": "50%",
-    "trade_status": "closed",
-    "createdAt": "2026-03-30T06:50:22.943Z",
-    "updatedAt": "2026-03-30T07:58:44.486Z",
-    "currentOrder": [
-      {
-        "orderid": "260330000631444",
-        "transactiontype": "BUY",
-        "price": 0,
-        "quantity": 130
-      }
-    ],
-    "exit_price": "MARKET",
-    "exit_time": "2026-03-30T06:54:38.298Z",
-    "exit_order_id": "260330000645023",
-    "sell_price": 61
-  },
-  {
-    "tradingsymbol": "BANKNIFTY30MAR2651000PE",
-    "symboltoken": "58527",
-    "exchange": "NFO",
-    "orderid": "260330000746332",
-    "transactiontype": "BUY",
-    "producttype": "BO",
-    "variety": "ROBO",
-    "duration": "DAY",
-    "quantity": "60",
-    "buy_price": 332.45,
-    "last_traded_price": 324.8,
-    "profit_loss": 1053,
+    "quantity": 1,
+    "buy_price": 22,
+    "last_traded_price": 22.7,
+    "profit_loss": 0,
     "highest_profit": 0,
     "limit_sell_price": null,
     "stop_loss": 2000,
     "trail": "50%",
-    "trade_status": "closed",
-    "createdAt": "2026-03-30T07:33:33.335Z",
-    "updatedAt": "2026-03-30T08:02:59.190Z",
+    "trade_status": "pending",
+    "createdAt": "2026-05-11T10:34:30.641Z",
+    "updatedAt": "2026-05-11T16:01:55.963Z",
     "currentOrder": [
       {
-        "orderid": "260330000812788",
-        "transactiontype": "SELL",
-        "price": 313.6,
-        "quantity": "30",
-        "status": "trigger pending",
-        "triggerprice": 320,
-        "updatetime": "30-Mar-2026 13:32:22"
+        "orderid": "0511a7660aa2AO",
+        "transactiontype": "BUY",
+        "price": 22,
+        "quantity": 1
       }
-    ],
-    "sell_price": 350
+    ]
   }
 ]

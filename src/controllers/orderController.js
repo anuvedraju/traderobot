@@ -1,6 +1,31 @@
 const { addTrade } = require("../data/trades");
 const { getSmartApi } = require("./authorizationController");
 
+function sendSuccess(res, data = {}, statusCode = 200) {
+  return res.status(statusCode).json({ success: true, ...data });
+}
+
+function sendError(res, err, fallbackMessage, statusCode = 500) {
+  const error = err?.message || err || fallbackMessage;
+  console.error(fallbackMessage, error);
+  return res.status(statusCode).json({ success: false, error });
+}
+
+function requireFields(res, body, fields) {
+  const missing = fields.filter((field) => !body[field]);
+  if (!missing.length) return false;
+
+  res.status(400).json({
+    success: false,
+    error: `${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} required`,
+  });
+  return true;
+}
+
+function toOrderQuantity(quantity) {
+  return Number(quantity) || quantity;
+}
+
 exports.placeOrder = async (req, res) => {
   const {
     tradingsymbol,
@@ -18,6 +43,19 @@ exports.placeOrder = async (req, res) => {
   } = req.body;
 
   try {
+    if (
+      requireFields(res, req.body, [
+        "tradingsymbol",
+        "symboltoken",
+        "transactiontype",
+        "exchange",
+        "ordertype",
+        "quantity",
+      ])
+    ) {
+      return;
+    }
+
     const smartApi = getSmartApi();
 
     const orderParams = {
@@ -31,12 +69,11 @@ exports.placeOrder = async (req, res) => {
       variety,
       duration,
       price,
-      quantity: Number(quantity) || quantity,
+      quantity: toOrderQuantity(quantity),
     };
 
     const response = await smartApi.placeOrder(orderParams);
-    res.json({ success: true, data: response });
-    console.log("data", response.data);
+
     addTrade({
       tradingsymbol: orderParams.tradingsymbol,
       symboltoken: orderParams.symboltoken,
@@ -52,9 +89,10 @@ exports.placeOrder = async (req, res) => {
       trail: "50%",
       trade_status: "pending",
     });
+
+    return sendSuccess(res, { data: response });
   } catch (err) {
-    console.error("Order error:", err);
-    res.status(500).json({ success: false, error: err.message || err });
+    return sendError(res, err, "Order error:");
   }
 };
 
@@ -78,10 +116,12 @@ exports.modifyOrder = async (req, res) => {
     const smartApi = getSmartApi();
 
     if (!orderid) {
-      return res.status(400).json({
-        success: false,
-        message: "orderid is required to modify an order.",
-      });
+      return sendError(
+        res,
+        "orderid is required to modify an order.",
+        "Modify order validation error:",
+        400
+      );
     }
 
     const modifyParams = {
@@ -102,17 +142,12 @@ exports.modifyOrder = async (req, res) => {
 
     const response = await smartApi.modifyOrder(modifyParams);
 
-    res.json({
-      success: true,
+    return sendSuccess(res, {
       message: "Order modified successfully",
       data: response,
     });
   } catch (err) {
-    console.error("❌ Modify order error:", err.message || err);
-    res.status(500).json({
-      success: false,
-      error: err.message || err,
-    });
+    return sendError(res, err, "Modify order error:");
   }
 };
 
@@ -124,10 +159,12 @@ exports.cancelOrder = async (req, res) => {
     const smartApi = getSmartApi();
 
     if (!orderid) {
-      return res.status(400).json({
-        success: false,
-        message: "orderid is required to cancel an order.",
-      });
+      return sendError(
+        res,
+        "orderid is required to cancel an order.",
+        "Cancel order validation error:",
+        400
+      );
     }
 
     const cancelParams = {
@@ -139,17 +176,12 @@ exports.cancelOrder = async (req, res) => {
 
     const response = await smartApi.cancelOrder(cancelParams);
 
-    res.json({
-      success: true,
+    return sendSuccess(res, {
       message: "Order cancelled successfully",
       data: response,
     });
   } catch (err) {
-    console.error("❌ Cancel order error:", err.message || err);
-    res.status(500).json({
-      success: false,
-      error: err.message || err,
-    });
+    return sendError(res, err, "Cancel order error:");
   }
 };
 
@@ -168,12 +200,15 @@ exports.sellMarket = async (req, res) => {
   try {
     const smartApi = getSmartApi();
 
-    if (!tradingsymbol || !symboltoken || !quantity || !exchange) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "tradingsymbol, symboltoken, exchange and quantity are required",
-      });
+    if (
+      requireFields(res, req.body, [
+        "tradingsymbol",
+        "symboltoken",
+        "exchange",
+        "quantity",
+      ])
+    ) {
+      return;
     }
 
     const sellParams = {
@@ -193,17 +228,12 @@ exports.sellMarket = async (req, res) => {
 
     const response = await smartApi.placeOrder(sellParams);
 
-    res.json({
-      success: true,
+    return sendSuccess(res, {
       message: "Sell market order placed successfully",
       data: response,
     });
   } catch (err) {
-    console.error("❌ Sell market error:", err.message || err);
-    res.status(500).json({
-      success: false,
-      error: err.message || err,
-    });
+    return sendError(res, err, "Sell market error:");
   }
 };
 
@@ -216,16 +246,11 @@ exports.getAllOrders = async (req, res) => {
 
     const response = await smartApi.getOrderBook();
 
-    res.json({
-      success: true,
+    return sendSuccess(res, {
       count: response?.data?.length || 0,
-      data: response.data,
+      data: response?.data || [],
     });
   } catch (err) {
-    console.error("❌ Failed to fetch orders:", err.message || err);
-    res.status(500).json({
-      success: false,
-      error: err.message || err,
-    });
+    return sendError(res, err, "Failed to fetch orders:");
   }
 };

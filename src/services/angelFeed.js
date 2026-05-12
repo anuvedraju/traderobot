@@ -17,6 +17,26 @@ let heartbeatTimer = null;
 let orderReconnectTimer = null;
 
 const exchangeMap = { NSE: 1, NFO: 2, BSE: 3, BFO: 4, MCX: 5 };
+const orderStatusMap = {
+  AB01: "open",
+  AB02: "cancelled",
+  AB03: "rejected",
+  AB04: "modified",
+  AB05: "complete",
+  AB09: "pending",
+  AB10: "trigger pending",
+};
+
+function normalizeExchangeType(exchangeType = "NFO") {
+  if (typeof exchangeType !== "string") return exchangeType;
+  return exchangeMap[exchangeType.toUpperCase()] || exchangeMap.NSE;
+}
+
+function normalizeTokens(tokens) {
+  return (Array.isArray(tokens) ? tokens : [tokens])
+    .map((token) => token?.toString().trim())
+    .filter(Boolean);
+}
 
 /**
  * Initialize both Market Feed and Order Status Feed
@@ -123,24 +143,16 @@ function initOrderStatusFeed(jwtToken) {
 
   orderWS.on("message", (msg) => {
     try {
-      if (msg === "pong" || msg.toString().trim() === "pong") return; // ignore ping/pong
-      const data = JSON.parse(msg);
+      const rawMessage = msg.toString().trim();
+      if (rawMessage === "pong") return;
+
+      const data = JSON.parse(rawMessage);
       if (data["status-code"] !== "200" || !data.orderData) return;
 
       const order = data.orderData;
       const code = data["order-status"];
-      const statusMap = {
-        AB01: "open",
-        AB02: "cancelled",
-        AB03: "rejected",
-        AB04: "modified",
-        AB05: "complete",
-        AB09: "pending",
-        AB10: "trigger pending",
-      };
-      order.status = statusMap[code] || "unknown";
+      order.status = orderStatusMap[code] || "unknown";
       feedEmitter.emit("orderUpdate", order);
-      console.log("order", order);
     } catch (err) {
       console.error("⚠️ Error parsing order message:", err.message);
     }
@@ -192,17 +204,15 @@ function subscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
   if (!marketWS || !isConnected)
     return console.warn("⚠️ Market feed not ready yet.");
 
-  const exType =
-    typeof exchangeType === "string"
-      ? exchangeMap[exchangeType.toUpperCase()] || 1
-      : exchangeType;
+  const normalizedTokens = normalizeTokens(tokens);
+  if (!normalizedTokens.length) return;
 
   const subReq = {
     correlationID: `sub_${Date.now()}`,
     action: 1,
     mode,
-    exchangeType: exType,
-    tokens: Array.isArray(tokens) ? tokens : [tokens],
+    exchangeType: normalizeExchangeType(exchangeType),
+    tokens: normalizedTokens,
   };
 
   try {
@@ -217,17 +227,15 @@ function unsubscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
   if (!marketWS || !isConnected)
     return console.warn("⚠️ Market feed not ready yet.");
 
-  const exType =
-    typeof exchangeType === "string"
-      ? exchangeMap[exchangeType.toUpperCase()] || 1
-      : exchangeType;
+  const normalizedTokens = normalizeTokens(tokens);
+  if (!normalizedTokens.length) return;
 
   const unsubReq = {
     correlationID: `unsub_${Date.now()}`,
     action: 0, // 0 = Unsubscribe
     mode,
-    exchangeType: exType,
-    tokens: Array.isArray(tokens) ? tokens : [tokens],
+    exchangeType: normalizeExchangeType(exchangeType),
+    tokens: normalizedTokens,
   };
 
   try {

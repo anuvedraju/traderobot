@@ -110,7 +110,7 @@ function handleTick(tick) {
         updateTrade(symboltoken, { stop_loss: 10 });
         continue;
       }
-      if (trade.highest_profit > 1200 && stopLoss !== 10) {
+      if (trade.highest_profit > 1800 && stopLoss !== 10) {
         console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
         updateTrade(symboltoken, { stop_loss: 10 });
       }

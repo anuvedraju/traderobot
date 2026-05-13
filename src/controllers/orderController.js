@@ -1,6 +1,9 @@
 const { addTrade } = require("../data/trades");
 const { getSmartApi } = require("./authorizationController");
 
+const ALLOWED_STOP_LOSSES = [450, 800, 1500, 2000, 4000];
+const DEFAULT_STOP_LOSS = 800;
+
 function sendSuccess(res, data = {}, statusCode = 200) {
   return res.status(statusCode).json({ success: true, ...data });
 }
@@ -24,6 +27,15 @@ function requireFields(res, body, fields) {
 
 function toOrderQuantity(quantity) {
   return Number(quantity) || quantity;
+}
+
+function parseStopLoss(stoploss) {
+  if (stoploss === undefined || stoploss === null || stoploss === "") {
+    return DEFAULT_STOP_LOSS;
+  }
+
+  const value = Number(stoploss);
+  return ALLOWED_STOP_LOSSES.includes(value) ? value : null;
 }
 
 exports.placeOrder = async (req, res) => {
@@ -57,6 +69,16 @@ exports.placeOrder = async (req, res) => {
     }
 
     const smartApi = getSmartApi();
+    const stopLossValue = parseStopLoss(stoploss);
+
+    if (!stopLossValue) {
+      return sendError(
+        res,
+        `stoploss must be one of ${ALLOWED_STOP_LOSSES.join(", ")}.`,
+        "Order validation error:",
+        400
+      );
+    }
 
     const orderParams = {
       tradingsymbol,
@@ -85,7 +107,7 @@ exports.placeOrder = async (req, res) => {
       duration: orderParams.duration,
       buy_price: orderParams.price,
       quantity: orderParams.quantity,
-      stop_loss: Number(stoploss) || 800,
+      stop_loss: stopLossValue,
       trail: "50%",
       trade_status: "pending",
     });

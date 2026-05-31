@@ -3,26 +3,33 @@
     "tradingsymbol": "YESBANK-EQ",
     "symboltoken": "11915",
     "exchange": "NSE",
-    "orderid": "260513000406055",
+    "orderid": "260513000711195",
     "transactiontype": "BUY",
     "producttype": "INTRADAY",
     "variety": "NORMAL",
     "duration": "DAY",
     "quantity": "1",
-    "buy_price": 22.25,
-    "last_traded_price": 22.24,
+    "buy_price": 22.38,
+    "last_traded_price": 22.38,
     "profit_loss": -0.01,
-    "highest_profit": 0.01,
+    "highest_profit": 0,
     "limit_sell_price": null,
     "stop_loss": 2000,
     "trail": "50%",
     "trade_status": "closed",
-    "createdAt": "2026-05-13T05:45:40.118Z",
-    "updatedAt": "2026-05-13T05:46:29.957Z",
-    "currentOrder": [],
+    "createdAt": "2026-05-13T08:17:45.701Z",
+    "updatedAt": "2026-05-13T08:18:12.031Z",
+    "currentOrder": [
+      {
+        "orderid": "260513000711195",
+        "transactiontype": "BUY",
+        "price": 0,
+        "quantity": 1
+      }
+    ],
     "exit_price": "MARKET",
-    "exit_time": "2026-05-13T05:46:10.569Z",
-    "exit_order_id": "260513000407156",
-    "sell_price": 22.24
+    "exit_time": "2026-05-13T08:18:05.262Z",
+    "exit_order_id": "260513000711655",
+    "sell_price": 22.37
   }
 ]

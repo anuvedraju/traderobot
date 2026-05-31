@@ -24,6 +24,7 @@ get .env
 # nano ~/traderobot/.env
 
 
+
 get logs for backend
  # pm2 logs backend
 
@@ -39,3 +40,5 @@ get logs for backend
  Recreate scripmaster
 # rm -rf scripmaster.json
 
+Dummy Ip
+# 192.168.1.100

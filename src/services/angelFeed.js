@@ -15,8 +15,19 @@ let reconnectTimer = null;
 let listenersAttached = false;
 let heartbeatTimer = null;
 let orderReconnectTimer = null;
+const pendingMarketSubscriptions = new Map();
 
-const exchangeMap = { NSE: 1, NFO: 2, BSE: 3, BFO: 4, MCX: 5 };
+const exchangeMap = {
+  NSE: 1,
+  NFO: 2,
+  BSE: 3,
+  BFO: 4,
+  MCX: 5,
+  NCO: 7,
+  NCX: 7,
+  CDS: 13,
+  CDE: 13,
+};
 const orderStatusMap = {
   AB01: "open",
   AB02: "cancelled",
@@ -28,14 +39,47 @@ const orderStatusMap = {
 };
 
 function normalizeExchangeType(exchangeType = "NFO") {
-  if (typeof exchangeType !== "string") return exchangeType;
-  return exchangeMap[exchangeType.toUpperCase()] || exchangeMap.NSE;
+  if (typeof exchangeType === "number") return exchangeType;
+  if (typeof exchangeType !== "string") return exchangeMap.NFO;
+  return exchangeMap[exchangeType.toUpperCase()] || exchangeMap.NFO;
 }
 
 function normalizeTokens(tokens) {
   return (Array.isArray(tokens) ? tokens : [tokens])
     .map((token) => token?.toString().trim())
     .filter(Boolean);
+}
+
+function getSubscriptionKey(exchangeType, mode) {
+  return `${normalizeExchangeType(exchangeType)}:${mode}`;
+}
+
+function queuePendingSubscription(tokens, exchangeType, mode) {
+  const normalizedTokens = normalizeTokens(tokens);
+  if (!normalizedTokens.length) return;
+
+  const key = getSubscriptionKey(exchangeType, mode);
+  if (!pendingMarketSubscriptions.has(key)) {
+    pendingMarketSubscriptions.set(key, {
+      exchangeType,
+      mode,
+      tokens: new Set(),
+    });
+  }
+
+  const pending = pendingMarketSubscriptions.get(key);
+  normalizedTokens.forEach((token) => pending.tokens.add(token));
+}
+
+function flushPendingSubscriptions() {
+  if (!marketWS || !isConnected || !pendingMarketSubscriptions.size) return;
+
+  const pending = [...pendingMarketSubscriptions.values()];
+  pendingMarketSubscriptions.clear();
+
+  pending.forEach(({ exchangeType, mode, tokens }) => {
+    subscribeTokens([...tokens], exchangeType, mode);
+  });
 }
 
 /**
@@ -68,6 +112,7 @@ async function initAngelFeed({ jwtToken, feedToken }) {
     console.log("📡 Market WebSocket connected ✅");
     emitFeedStatus();
     attachMarketListeners(jwtToken, feedToken);
+    flushPendingSubscriptions();
 
     // --- Order Feed (Status Updates) ---
     initOrderStatusFeed(jwtToken);
@@ -201,11 +246,16 @@ async function reconnectFeed({ jwtToken, feedToken }) {
  * Subscribe dynamically to instruments
  */
 function subscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
-  if (!marketWS || !isConnected)
-    return console.warn("⚠️ Market feed not ready yet.");
-
   const normalizedTokens = normalizeTokens(tokens);
-  if (!normalizedTokens.length) return;
+  if (!normalizedTokens.length) return false;
+
+  if (!marketWS || !isConnected) {
+    queuePendingSubscription(normalizedTokens, exchangeType, mode);
+    console.warn(
+      `⚠️ Market feed not ready yet. Queued subscription for ${normalizedTokens.join(", ")} [${exchangeType || "NFO"}]`
+    );
+    return false;
+  }
 
   const subReq = {
     correlationID: `sub_${Date.now()}`,
@@ -218,8 +268,11 @@ function subscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
   try {
     marketWS.fetchData(subReq);
     console.log(`✅ Subscribed to ${subReq.tokens.join(", ")} [${exchangeType}]`);
+    return true;
   } catch (err) {
     console.error("⚠️ Subscription failed:", err.message);
+    queuePendingSubscription(normalizedTokens, exchangeType, mode);
+    return false;
   }
 }
 

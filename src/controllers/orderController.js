@@ -26,6 +26,31 @@ function toOrderQuantity(quantity) {
   return Number(quantity) || quantity;
 }
 
+function getAngelOrderResponse(response = {}) {
+  return response?.data && typeof response.data === "object" ? response.data : response;
+}
+
+function getAngelOrderId(response = {}) {
+  const data = getAngelOrderResponse(response);
+  return data?.data?.orderid || data?.orderid || response?.data?.orderid;
+}
+
+function isAngelOrderRejected(response = {}) {
+  const data = getAngelOrderResponse(response);
+  return data?.success === false || data?.status === false;
+}
+
+function sendAngelOrderFailure(res, response, fallbackMessage = "Order failed") {
+  const data = getAngelOrderResponse(response);
+  return res.status(400).json({
+    success: false,
+    message: data?.message || data?.error || fallbackMessage,
+    error: data?.message || data?.error || fallbackMessage,
+    errorCode: data?.errorCode,
+    data,
+  });
+}
+
 exports.placeOrder = async (req, res) => {
   const {
     tradingsymbol,
@@ -73,13 +98,16 @@ exports.placeOrder = async (req, res) => {
     };
 
     const response = await smartApi.placeOrder(orderParams);
+    if (isAngelOrderRejected(response)) {
+      return sendAngelOrderFailure(res, response);
+    }
 
     addTrade({
       tradingsymbol: orderParams.tradingsymbol,
       symboltoken: orderParams.symboltoken,
       exchange: orderParams.exchange,
       transactiontype: orderParams.transactiontype,
-      orderid: response.data.orderid,
+      orderid: getAngelOrderId(response),
       producttype: orderParams.producttype,
       variety: orderParams.variety,
       duration: orderParams.duration,
@@ -227,6 +255,9 @@ exports.sellMarket = async (req, res) => {
     console.log("🔻 Selling at market:", sellParams);
 
     const response = await smartApi.placeOrder(sellParams);
+    if (isAngelOrderRejected(response)) {
+      return sendAngelOrderFailure(res, response, "Sell market order failed");
+    }
 
     return sendSuccess(res, {
       message: "Sell market order placed successfully",

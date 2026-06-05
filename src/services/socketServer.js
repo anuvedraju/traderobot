@@ -20,7 +20,25 @@ function initSocketServer(httpServer) {
     pingTimeout: 60000,
   });
 
-  const activeSubscriptions = new Set();
+  const activeSubscriptions = new Map();
+
+  const normalizeToken = (value) =>
+    value
+      ?.toString()
+      .replace(/['"\s]+/g, "")
+      .trim();
+
+  const normalizeExchange = (exchange) =>
+    exchange?.toString().trim().toUpperCase() || "NFO";
+
+  const getTickToken = (tick = {}) =>
+    normalizeToken(
+      tick.symboltoken ||
+        tick.token ||
+        tick.Token ||
+        tick.symbol ||
+        tick.tradingsymbol
+    );
 
   const shouldUnsubscribeToken = (tokenStr) => {
     const clientsInRoom = io.sockets.adapter.rooms.get(tokenStr);
@@ -48,15 +66,21 @@ function initSocketServer(httpServer) {
 
     socket.on("subscribe", (token, exchange) => {
       if (!token) return;
-      const tokenStr = token.toString().trim();
+      const tokenStr = normalizeToken(token);
+      if (!tokenStr) return;
+      const exchangeName = normalizeExchange(exchange);
 
       socket.join(tokenStr);
-      console.log(`📩 ${socket.id} subscribed → ${tokenStr}`);
+      console.log(`📩 ${socket.id} subscribed → ${tokenStr} [${exchangeName}]`);
 
-      if (!activeSubscriptions.has(tokenStr)) {
-        subscribeTokens(tokenStr, exchange);
-        activeSubscriptions.add(tokenStr);
-        console.log(`📡 Angel feed subscribed for ${tokenStr}`);
+      const activeExchange = activeSubscriptions.get(tokenStr);
+      if (!activeExchange || activeExchange !== exchangeName) {
+        if (activeExchange) {
+          unsubscribeTokens(tokenStr, activeExchange);
+        }
+        subscribeTokens(tokenStr, exchangeName);
+        activeSubscriptions.set(tokenStr, exchangeName);
+        console.log(`📡 Angel feed subscribed for ${tokenStr} [${exchangeName}]`);
       }
 
       sendFeedStatus(socket);
@@ -64,18 +88,20 @@ function initSocketServer(httpServer) {
 
     socket.on("unsubscribe", (token, exchange) => {
       if (!token) return;
-      const tokenStr = token.toString().trim();
+      const tokenStr = normalizeToken(token);
+      if (!tokenStr) return;
+      const exchangeName = activeSubscriptions.get(tokenStr) || normalizeExchange(exchange);
 
       socket.leave(tokenStr);
-      console.log(`📤 ${socket.id} unsubscribed → ${tokenStr}`);
+      console.log(`📤 ${socket.id} unsubscribed → ${tokenStr} [${exchangeName}]`);
 
       const { shouldUnsubscribe, isTradeExisting } =
         shouldUnsubscribeToken(tokenStr);
 
       if (shouldUnsubscribe) {
-        unsubscribeTokens(tokenStr, exchange);
+        unsubscribeTokens(tokenStr, exchangeName);
         activeSubscriptions.delete(tokenStr);
-        console.log(`🛑 Angel feed unsubscribed for ${tokenStr}`);
+        console.log(`🛑 Angel feed unsubscribed for ${tokenStr} [${exchangeName}]`);
       } else {
         console.log(
           isTradeExisting
@@ -106,6 +132,11 @@ function initSocketServer(httpServer) {
           case "450":
             console.log("➡️ Setting stop-loss = 450");
             updateTrade(tokenStr, { stop_loss: 450 });
+            break;
+
+          case "800":
+            console.log("➡️ Setting stop-loss = 800");
+            updateTrade(tokenStr, { stop_loss: 800 });
             break;
 
           case "50%":
@@ -147,14 +178,14 @@ function initSocketServer(httpServer) {
       console.log(`❌ Disconnected → ${socket.id} (${reason})`);
 
       // Cleanup unsubscribed rooms
-      for (const tokenStr of [...activeSubscriptions]) {
+      for (const [tokenStr, exchangeName] of [...activeSubscriptions.entries()]) {
         const { shouldUnsubscribe, isTradeExisting } =
           shouldUnsubscribeToken(tokenStr);
 
         if (shouldUnsubscribe) {
-          unsubscribeTokens(tokenStr);
+          unsubscribeTokens(tokenStr, exchangeName);
           activeSubscriptions.delete(tokenStr);
-          console.log(`🧹 Auto-cleaned subscription → ${tokenStr}`);
+          console.log(`🧹 Auto-cleaned subscription → ${tokenStr} [${exchangeName}]`);
         } else if (isTradeExisting) {
           console.log(`⚠️ Keeping ${tokenStr} subscribed — trade still exists.`);
         }
@@ -170,8 +201,14 @@ function initSocketServer(httpServer) {
   // 🌍 FEED → SOCKET EMITTERS
   // ==============================
   feedEmitter.on("tick", (tick) => {
-    if (!tick?.symboltoken) return;
-    io.to(tick.symboltoken.toString()).emit("tick", tick);
+    const tokenStr = getTickToken(tick);
+    if (!tokenStr) return;
+
+    io.to(tokenStr).emit("tick", {
+      ...tick,
+      symboltoken: tokenStr,
+      token: tokenStr,
+    });
   });
 
   feedEmitter.on("orderUpdate", (order) => {

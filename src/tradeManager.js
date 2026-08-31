@@ -59,10 +59,10 @@ function handleTick(tick) {
     // ─────────────────────────────────────────────
     const symboltoken = normalizeSymbolToken(
       tick.symboltoken ||
-      tick.token ||
-      tick.Token ||
-      tick.symbol ||
-      tick.tradingsymbol
+        tick.token ||
+        tick.Token ||
+        tick.symbol ||
+        tick.tradingsymbol,
     );
     if (!symboltoken) return;
 
@@ -110,21 +110,34 @@ function handleTick(tick) {
         updateTrade(symboltoken, { stop_loss: 10 });
         continue;
       }
-      if (trade.highest_profit > 650 && stopLoss !== 10) {
-        console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
-        updateTrade(symboltoken, { stop_loss: 800 });
-      }
-      if (trade.highest_profit > 850 && stopLoss !== 10  && trade.quantity === 130) {
+
+      //normal
+
+      if (
+        trade.highest_profit > 850 &&
+        stopLoss !== 10 &&
+        trade.quantity === 130
+      ) {
         console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
         updateTrade(symboltoken, { stop_loss: 10 });
       }
-      if (trade.highest_profit > 1200 && trade.exchange === "NFO"  && trade.quantity === 130) {
+      if (
+        trade.highest_profit > 1200 &&
+        trade.exchange === "NFO" &&
+        trade.quantity === 130
+      ) {
         console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
         closeTrade(symboltoken);
       }
+      
+//extra 
+      if (trade.highest_profit > 650 && stopLoss !== 10) {
+        console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
+        updateTrade(symboltoken, { stop_loss: 1200 });
+      }
       if (trade.highest_profit > 1500 && trade.exchange === "BFO") {
         console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
-        updateTrade(symboltoken, { target: 60 });
+        updateTrade(symboltoken, { target: 20 });
         // closeTrade(symboltoken);
       }
 

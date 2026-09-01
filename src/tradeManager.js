@@ -111,33 +111,21 @@ function handleTick(tick) {
         continue;
       }
 
-      //normal
-
-      if (
-        trade.highest_profit > 850 &&
-        stopLoss !== 10 &&
-        trade.quantity === 130
-      ) {
-        console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
-        updateTrade(symboltoken, { stop_loss: 10 });
-      }
-      if (
-        trade.highest_profit > 1200 &&
-        trade.exchange === "NFO" &&
-        trade.quantity === 130
-      ) {
-        console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
-        closeTrade(symboltoken);
-      }
-      
+//normal
 //extra 
       if (trade.highest_profit > 650 && stopLoss !== 10) {
         console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
         updateTrade(symboltoken, { stop_loss: 1200 });
       }
-      if (trade.highest_profit > 1500 && trade.exchange === "BFO") {
+      if (trade.highest_profit > 1500) {
         console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
-        updateTrade(symboltoken, { target: 20 });
+        updateTrade(symboltoken, { stop_loss: 800 });
+        // closeTrade(symboltoken);
+      }
+        if (trade.highest_profit > 1800) {
+        console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
+        updateTrade(symboltoken, { stop_loss: 10 });
+        updateTrade(symboltoken, { target: 45 });
         // closeTrade(symboltoken);
       }
 

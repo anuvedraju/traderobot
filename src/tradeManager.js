@@ -132,7 +132,7 @@ function handleTick(tick) {
 
         if (trade.highest_profit > 1800 && trade.exchange === "BFO") {
         console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
-        // closeTrade(symboltoken);
+        closeTrade(symboltoken);
         updateTrade(symboltoken, { stop_loss: 10 });
         updateTrade(symboltoken, { target: 40 });
         // closeTrade(symboltoken);

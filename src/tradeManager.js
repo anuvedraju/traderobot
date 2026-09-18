@@ -219,7 +219,15 @@ function handleOrderUpdate(order) {
       }
     } else if (["cancelled", "rejected"].includes(status)) {
       if (txnType === "SELL") {
-        console.log(`⚠️ SELL order ${status} — skipping close.`);
+        // Cancelling an exit order does not close the position, but it must
+        // stop appearing as an actionable pending order after reconciliation.
+        const trade = getActiveTrades().find(t => t.symboltoken === symboltoken);
+        const orders = Array.isArray(trade?.currentOrder) ? trade.currentOrder : trade?.currentOrder ? [trade.currentOrder] : [];
+        updates.currentOrder = orders.map(current =>
+          String(current.orderid) === String(order.orderid)
+            ? { ...current, ...order, status }
+            : current
+        );
       } else {
         updates.trade_status = status;
         console.log(`⚠️ CANCELL order ${status} — skipping close.`);

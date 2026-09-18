@@ -224,25 +224,28 @@ function initSocketServer(httpServer) {
   // ==============================
   // 💼 TRADE EMITTERS (backend updates)
   // ==============================
-  const lastEmitted = new Map();
-
+  const pendingTrades = new Map();
+  const timers = new Map();
   tradeEmitter.on("tradeUpdated", (trade) => {
     if (!trade?.symboltoken) return;
-    const tokenStr = trade.symboltoken.toString();
-
-    const now = Date.now();
-    const lastTime = lastEmitted.get(tokenStr) || 0;
-
-    // Debounce frequent updates (like PnL)
-    if (now - lastTime < 200) return;
-    lastEmitted.set(tokenStr, now);
-
-    io.emit("tradeUpdated", trade);
+    const token = String(trade.symboltoken);
+    // Trailing coalescing preserves the final update, including cancellation.
+    pendingTrades.set(token, { ...pendingTrades.get(token), ...trade });
+    if (!timers.has(token)) timers.set(token, setTimeout(() => {
+      timers.delete(token);
+      const latest = pendingTrades.get(token);
+      pendingTrades.delete(token);
+      if (latest) io.emit("tradeUpdated", latest);
+    }, 100));
   });
 
   tradeEmitter.on("tradeDeleted", ({ symboltoken }) => {
     if (!symboltoken) return;
-    io.emit("tradeDeleted", { symboltoken: symboltoken.toString() });
+    const token = String(symboltoken);
+    clearTimeout(timers.get(token));
+    timers.delete(token);
+    pendingTrades.delete(token);
+    io.emit("tradeDeleted", { symboltoken: token });
   });
 
   console.log("🔌 Socket.IO server ready and bound to feed/trade emitters ✅");

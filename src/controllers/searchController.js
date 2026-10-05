@@ -1,6 +1,7 @@
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
+const { getSearchCooldownRemainingMs } = require("../services/searchCooldown");
 
 const CACHE_PATH = path.join(__dirname, "../data/scripmaster.json");
 let cachedData = null; // in-memory cache
@@ -56,6 +57,17 @@ function parseExpiry(expiry) {
 // ✅ Smart orderless search (any order: PFC 400 CE)
 exports.searchSymbol = async (req, res) => {
   try {
+    const remainingMs = getSearchCooldownRemainingMs();
+    if (remainingMs > 0) {
+      const retryAfterSeconds = Math.ceil(remainingMs / 1000);
+      res.set("Retry-After", String(retryAfterSeconds));
+      return res.status(429).json({
+        success: false,
+        message: "Search is disabled for 5 minutes after a stop-loss is hit.",
+        retryAfterSeconds,
+      });
+    }
+
     const query = req.params.query?.toUpperCase().trim();
     if (!query)
       return res.status(400).json({ success: false, message: "Query required" });

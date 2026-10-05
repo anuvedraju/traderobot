@@ -65,6 +65,7 @@ exports.placeOrder = async (req, res) => {
     variety,
     duration,
     stoploss,
+    take_profit,
   } = req.body;
 
   try {
@@ -114,6 +115,7 @@ exports.placeOrder = async (req, res) => {
       buy_price: orderParams.price,
       quantity: orderParams.quantity,
       stop_loss: Number(stoploss) || 800,
+      take_profit,
       trail: "50%",
       trade_status: "pending",
     });

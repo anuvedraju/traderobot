@@ -11,6 +11,7 @@ const {
 } = require("./src/services/angelFeed");
 const { initSocketServer } = require("./src/services/socketServer");
 const { autoLogin } = require("./src/controllers/authorizationController");
+const { startOrderReconciliation } = require("./src/services/orderReconciliation");
 
 dotenv.config();
 
@@ -44,11 +45,12 @@ async function startServer() {
     console.log("✅ SmartAPI Login Successful");
 
     // 3️⃣ Initialize WebSockets (Tick + Order Feed)
+    initTradeManager();
     await initAngelFeed({ jwtToken, feedToken });
     console.log("✅ Angel One Feeds Active");
 
     // 4️⃣ Initialize Trade Manager (strategy brain)
-    initTradeManager();
+    startOrderReconciliation();
 
     // 5️⃣ Subscribe to feed events
     feedEmitter.on("tick", (tick) => {

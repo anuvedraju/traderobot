@@ -7,6 +7,7 @@ const {
   setPnL,
 } = require("./data/trades");
 const { closeTrade } = require("./functions");
+const { startSearchCooldown } = require("./services/searchCooldown");
 
 let isInitialized = false;
 
@@ -104,10 +105,10 @@ function handleTick(tick) {
 
       if (loss <= -stopLoss) {
         console.log(`🚨 ${symboltoken} hit stop-loss | PnL: ₹${loss}`);
-
         updateTrade(symboltoken, { trade_status: "closing" });
         closeTrade(symboltoken);
         updateTrade(symboltoken, { stop_loss: 10 });
+        startSearchCooldown();
         continue;
       }
 

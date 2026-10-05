@@ -9,7 +9,6 @@ const tradeEmitter = new EventEmitter();
 
 let trades = [];
 let saveTimer = null;
-let lastEmit = 0;
 
 /**
  * Add a new trade and subscribe to its token feed.
@@ -42,6 +41,11 @@ function addTrade(order = {}) {
     highest_profit: 0,
     limit_sell_price: Number(order.limit_sell_price) || null,
     stop_loss: Number(order.stop_loss) || 800,
+    take_profit:
+      order.take_profit != null && order.take_profit !== "" &&
+      Number.isFinite(Number(order.take_profit))
+        ? Number(order.take_profit)
+        : null,
     trail: order.trail || "none",
     trade_status: order.trade_status || "pending",
     createdAt: new Date(),
@@ -112,7 +116,9 @@ function updateTrade(identifier, updates = {}) {
   if (!identifier || !Object.keys(updates).length) return;
 
   const id = identifier.toString();
-  const trade = trades.find((t) => t.symboltoken === id || t.orderid === id);
+  const trade = trades.find((t) => String(t.orderid) === id) ||
+    [...trades].reverse().find((t) => t.symboltoken === id && !["closed", "cancelled", "rejected"].includes(t.trade_status)) ||
+    [...trades].reverse().find((t) => t.symboltoken === id);
   if (!trade) return console.warn(`⚠️ Trade not found for ${id}`);
 
   Object.assign(trade, updates, { updatedAt: new Date() });
@@ -202,11 +208,8 @@ function setPnL(symboltoken, price) {
   scheduleSave();
 }
 
-// Emit trade update (debounced to reduce spam)
+// SocketServer coalesces updates and guarantees delivery of the latest state.
 function emitTrade(trade) {
-  const now = Date.now();
-  if (now - lastEmit < 150) return; // Prevent spam during fast ticks
-  lastEmit = now;
   tradeEmitter.emit("tradeUpdated", trade);
 }
 

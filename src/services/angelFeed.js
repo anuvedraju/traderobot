@@ -192,11 +192,11 @@ function initOrderStatusFeed(jwtToken) {
       if (rawMessage === "pong") return;
 
       const data = JSON.parse(rawMessage);
-      if (data["status-code"] !== "200" || !data.orderData) return;
+      if (String(data["status-code"]) !== "200" || !data.orderData) return;
 
       const order = data.orderData;
       const code = data["order-status"];
-      order.status = orderStatusMap[code] || "unknown";
+      order.status = orderStatusMap[code] || order.orderstatus || order.status || "unknown";
       feedEmitter.emit("orderUpdate", order);
     } catch (err) {
       console.error("⚠️ Error parsing order message:", err.message);

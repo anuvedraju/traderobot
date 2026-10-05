@@ -59,6 +59,8 @@ function initSocketServer(httpServer) {
 
     // Send current feed/session status
     sendFeedStatus(socket);
+    // Restore statuses missed while the client was disconnected.
+    getTrades().forEach((trade) => socket.emit("tradeUpdated", trade));
 
     // ==============================
     // 🔔 SUBSCRIBE / UNSUBSCRIBE LOGIC
@@ -124,6 +126,16 @@ function initSocketServer(httpServer) {
         console.log(`📝 Frontend requested action → ${tokenStr}`, type);
     
         switch (type) {
+          case "take_profit": {
+            const value = data.take_profit;
+            const takeProfit = value == null || value === "" ? null : Number(value);
+            if (takeProfit !== null && !Number.isFinite(takeProfit)) {
+              console.warn("⚠️ Invalid take_profit amount:", value);
+              return;
+            }
+            updateTrade(tokenStr, { take_profit: takeProfit });
+            break;
+          }
           case "10":
             console.log("➡️ Setting stop-loss = 10");
             updateTrade(tokenStr, { stop_loss: 10 });

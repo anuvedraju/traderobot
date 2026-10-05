@@ -14,7 +14,8 @@ function load(file, mocks) {
   let update;
   const manager = load('src/tradeManager.js', {
     './services/angelFeed': { feedEmitter },
-    './data/trades': { getActiveTrades: () => [trade], updateTrade: (_, data) => { update = data; } },
+    './services/searchCooldown': { startSearchCooldown() {} },
+    './data/trades': { getTrades: () => [trade], getActiveTrades: () => [trade], updateTrade: (_, data) => { update = data; } },
     './functions': { closeTrade() {} },
   });
   manager.initTradeManager();

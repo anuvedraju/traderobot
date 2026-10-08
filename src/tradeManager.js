@@ -51,7 +51,7 @@ function normalizeLtp(rawLtp) {
 }
 
 /**
- * Handle tick updates: update PnL, manage SL & trailing logic.
+ * Handle tick updates: update PnL, manage take profit, SL & trailing logic.
  */
 function handleTick(tick) {
   try {
@@ -103,6 +103,18 @@ function handleTick(tick) {
       const loss = Number(trade.profit_loss || 0);
       const stopLoss = Number(trade.stop_loss || 800);
 
+      // Take profit is a total position PnL amount in rupees, not an LTP.
+      // Mark closing before submitting so subsequent ticks cannot submit twice.
+      const takeProfit = trade.take_profit == null || trade.take_profit === ""
+        ? null
+        : Number(trade.take_profit);
+      if (takeProfit !== null && Number.isFinite(takeProfit) && loss >= takeProfit) {
+        console.log(`🎯 ${symboltoken} hit take-profit | PnL: ₹${loss} | Target: ₹${takeProfit}`);
+        updateTrade(symboltoken, { trade_status: "closing" });
+        closeTrade(symboltoken);
+        continue;
+      }
+
       if (loss <= -stopLoss) {
         console.log(`🚨 ${symboltoken} hit stop-loss | PnL: ₹${loss}`);
         updateTrade(symboltoken, { trade_status: "closing" });
@@ -134,7 +146,7 @@ function handleTick(tick) {
         if (trade.highest_profit > 1800 && trade.exchange === "BFO") {
         console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
         // closeTrade(symboltoken);
-        updateTrade(tokenStr, { take_profit: 1500 });
+        updateTrade(symboltoken, { take_profit: 1500 });
         updateTrade(symboltoken, { stop_loss: 10 });
         updateTrade(symboltoken, { target: 40 });
         // closeTrade(symboltoken);

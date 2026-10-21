@@ -103,12 +103,20 @@ function handleTick(tick) {
       const loss = Number(trade.profit_loss || 0);
       const stopLoss = Number(trade.stop_loss || 800);
 
-      // Take profit is a total position PnL amount in rupees, not an LTP.
+      // Exchange rules activate the pullback exit level from peak position PnL.
+      if ((trade.exchange === "BFO" && trade.highest_profit > 1800) ||
+          (trade.exchange === "NFO" && trade.highest_profit > 1800)) {
+        updateTrade(symboltoken, { take_profit: 1500 });
+      }
+
+      // Take profit is a pullback floor in total position PnL (rupees).
+      // Require a prior peak above it so setting it before a rise cannot exit early.
       // Mark closing before submitting so subsequent ticks cannot submit twice.
       const takeProfit = trade.take_profit == null || trade.take_profit === ""
         ? null
         : Number(trade.take_profit);
-      if (takeProfit !== null && Number.isFinite(takeProfit) && loss >= takeProfit) {
+      if (takeProfit !== null && Number.isFinite(takeProfit) &&
+          trade.highest_profit > takeProfit && loss <= takeProfit) {
         console.log(`🎯 ${symboltoken} hit take-profit | PnL: ₹${loss} | Target: ₹${takeProfit}`);
         updateTrade(symboltoken, { trade_status: "closing" });
         closeTrade(symboltoken);
@@ -136,17 +144,9 @@ function handleTick(tick) {
         updateTrade(symboltoken, { target: 45 });
         // closeTrade(symboltoken);
       }
-        if (trade.highest_profit > 1800 && trade.exchange === "NFO") {
-        console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
-        closeTrade(symboltoken);
-        updateTrade(symboltoken, { stop_loss: 10 });
-        // closeTrade(symboltoken);
-      }
-
         if (trade.highest_profit > 1800 && trade.exchange === "BFO") {
         console.log(`🔒 Tightening stop-loss for ${symboltoken} to ₹10`);
         // closeTrade(symboltoken);
-        updateTrade(symboltoken, { take_profit: 1500 });
         updateTrade(symboltoken, { stop_loss: 10 });
         updateTrade(symboltoken, { target: 40 });
         // closeTrade(symboltoken);

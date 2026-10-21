@@ -36,34 +36,46 @@ function scenario(takeProfit, exchange = 'NFO') {
   return { trade, closes, tick: price => feedEmitter.emit('tick', { token: '123', ltp: price * 100 }) };
 }
 
-const exact = scenario(500);
-exact.tick(149.99);
-assert.equal(exact.closes.length, 0, 'below target must remain open');
-exact.tick(150);
-assert.equal(exact.trade.profit_loss, 500);
-assert.equal(exact.trade.trade_status, 'closing');
-assert.deepEqual(exact.closes, ['123'], 'equal target must request a market close');
-exact.tick(151);
-assert.equal(exact.closes.length, 1, 'further ticks must not duplicate the close');
-
-const jump = scenario('500');
-jump.tick(160);
-assert.equal(jump.closes.length, 1, 'jump above a string target must close');
-
-for (const value of [null, '', undefined, 'invalid']) {
-  const disabled = scenario(value);
-  disabled.tick(160);
-  assert.equal(disabled.closes.length, 0, 'unset or invalid targets must not close');
+// Manual take_profit is a pullback floor, not an upward target.
+for (const value of [500, '500', 0]) {
+  const position = scenario(value, 'NSE');
+  position.tick(100);
+  position.tick(100 + Number(value) / 10);
+  assert.equal(position.closes.length, 0, 'must first exceed the floor');
+  position.tick(160);
+  assert.equal(position.closes.length, 0, 'rising through floor must stay open');
+  position.tick(100 + Number(value) / 10);
+  assert.equal(position.closes.length, 1, 'return to floor must close');
+  position.tick(100);
+  assert.equal(position.closes.length, 1, 'subsequent ticks must not duplicate exit');
 }
 
-const zero = scenario(0);
-zero.tick(100);
-assert.equal(zero.closes.length, 1, 'explicit zero must not be treated as unset');
+for (const value of [null, '', undefined, 'invalid']) {
+  const position = scenario(value, 'NSE');
+  position.tick(160);
+  position.tick(140);
+  assert.equal(position.closes.length, 0, 'unset floor must not exit');
+}
 
-const bfo = scenario(null, 'BFO');
-bfo.tick(290);
-assert.equal(bfo.trade.take_profit, 1500, 'BFO branch must update the correct token');
-bfo.tick(290);
-assert.equal(bfo.closes.length, 1);
+for (const exchange of ['BFO', 'NFO']) {
+  for (const pullback of [250, 240]) {
+    const position = scenario(null, exchange);
+    if (exchange === 'BFO') {
+      position.tick(280);
+      assert.equal(position.trade.take_profit, null, 'exactly 1800 must not activate BFO floor');
+    }
+    position.tick(290);
+    assert.equal(position.trade.take_profit, 1500, 'exchange rule must set take_profit');
+    assert.equal(position.trade.profit_floor, undefined, 'no separate profit_floor field');
+    position.tick(310);
+    position.tick(260);
+    assert.equal(position.closes.length, 0, 'profit above floor must remain open');
+    position.tick(pullback);
+    assert.equal(position.closes.length, 1, 'pullback to or below floor must close');
+    assert.equal(position.trade.trade_status, 'closing');
+    position.tick(240);
+    assert.equal(position.closes.length, 1, 'must not duplicate exit');
+  }
+}
 
-console.log('PASS: take-profit equality, overshoot, quantity-based PnL, disabled targets, duplicate prevention, and BFO branch');
+console.log('PASS: take_profit pullback activation, equality, gap below floor, disabled values, NFO/BFO rules, and duplicate prevention');

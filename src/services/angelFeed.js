@@ -156,11 +156,6 @@ function attachMarketListeners(jwtToken, feedToken) {
  * wss://tns.angelone.in/smart-order-update
  */
 function initOrderStatusFeed(jwtToken) {
-  if (!process.env.ORDER_FEED_URL) {
-    console.warn("⚠️ ORDER_FEED_URL missing, skipping order status feed.");
-    return;
-  }
-
   if (orderReconnectTimer) {
     clearTimeout(orderReconnectTimer);
     orderReconnectTimer = null;
@@ -177,7 +172,7 @@ function initOrderStatusFeed(jwtToken) {
   }
 
   console.log("📦 Connecting to Order Status Feed...");
-  orderWS = new WebSocket(process.env.ORDER_FEED_URL, {
+  orderWS = new WebSocket(process.env.ORDER_FEED_URL || "wss://tns.angelone.in/smart-order-update", {
     headers: { Authorization: `Bearer ${jwtToken}` },
   });
 

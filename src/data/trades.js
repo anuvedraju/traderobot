@@ -24,6 +24,12 @@ function addTrade(order = {}) {
   const token = symboltoken.toString();
   const type = transactiontype?.toUpperCase() || "";
 
+  // The order feed can arrive before the placeOrder HTTP response.
+  const existing = order.orderid && trades.find(
+    trade => String(trade.orderid) === String(order.orderid)
+  );
+  if (existing) return existing;
+
   // ✅ Common structure for every trade/order
   const tradeData = {
     tradingsymbol,

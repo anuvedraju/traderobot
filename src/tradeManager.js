@@ -5,6 +5,8 @@ const {
   updatePnL,
   getActiveTrades,
   setPnL,
+  addTrade,
+  getTrades,
 } = require("./data/trades");
 const { closeTrade } = require("./functions");
 const { startSearchCooldown } = require("./services/searchCooldown");
@@ -37,11 +39,11 @@ function normalizeSymbolToken(value) {
 }
 
 function normalizeStatus(value) {
-  return value?.toString().toLowerCase();
+  return value?.toString().trim().toLowerCase();
 }
 
 function normalizeTransactionType(value) {
-  return value?.toString().toUpperCase();
+  return value?.toString().trim().toUpperCase();
 }
 
 function normalizeLtp(rawLtp) {
@@ -208,10 +210,34 @@ function handleOrderUpdate(order) {
     if (!order) return;
 
     const symboltoken = normalizeSymbolToken(order.symboltoken);
-    const status = normalizeStatus(order.status);
+    const status = normalizeStatus(order.orderstatus || order.status);
     const txnType = normalizeTransactionType(order.transactiontype);
 
     if (!symboltoken || !status) return;
+
+    // Broker app entries do not pass through our placeOrder controller.
+    // Identify entries by order ID so repeats cannot create or reopen trades.
+    let entryTrade = order.orderid && getTrades().find(
+      trade => String(trade.orderid) === String(order.orderid),
+    );
+    if (txnType === "BUY") {
+      if (!order.orderid) return;
+      if (!entryTrade) {
+        if (!order.tradingsymbol || !order.exchange ||
+            !Number.isFinite(Number(order.quantity)) || Number(order.quantity) <= 0) return;
+        entryTrade = addTrade({
+          ...order,
+          symboltoken,
+          transactiontype: txnType,
+          buy_price: Number(order.averageprice) || Number(order.price) || 0,
+          stop_loss: 2000,
+          trade_status: status === "complete" ? "running" : status,
+        });
+      }
+      if (!entryTrade || ["closed", "cancelled", "rejected", "closing"].includes(entryTrade.trade_status)) return;
+      // Delayed pending messages must not turn a filled position back to pending.
+      if (entryTrade.trade_status === "running" && status !== "complete") return;
+    }
 
     console.log(`📦 Order update: ${symboltoken} → ${status}`);
 
@@ -283,7 +309,7 @@ function handleOrderUpdate(order) {
     }
 
     if (Object.keys(updates).length) {
-      updateTrade(symboltoken, updates);
+      updateTrade(entryTrade?.orderid || symboltoken, updates);
     }
 
     if (updates.trade_status)

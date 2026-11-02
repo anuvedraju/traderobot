@@ -29,6 +29,7 @@ function scenario(takeProfit, exchange = 'NFO') {
   });
   const closes = [];
   load('src/tradeManager.js', {
+    './services/externalBuyGuard': { async exitExternalBuy() {} },
     './services/angelFeed': { feedEmitter }, './data/trades': store,
     './functions': { closeTrade: token => closes.push(token) },
     './services/searchCooldown': { startSearchCooldown() {} },

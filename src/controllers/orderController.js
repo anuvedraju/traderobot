@@ -1,4 +1,5 @@
-const { addTrade } = require("../data/trades");
+const { prepareSell } = require("../services/sellQuantity");
+const { addTrade, getTrades } = require("../data/trades");
 const { getSmartApi } = require("./authorizationController");
 
 function sendSuccess(res, data = {}, statusCode = 200) {
@@ -84,9 +85,10 @@ exports.placeOrder = async (req, res) => {
 
     const smartApi = getSmartApi();
 
-    const orderParams = {
+    let orderParams = {
       tradingsymbol,
       symboltoken,
+      ordertag: "Traderobot",
       transactiontype, // "BUY" or "SELL"
       exchange,
       ordertype,
@@ -98,6 +100,9 @@ exports.placeOrder = async (req, res) => {
       quantity: toOrderQuantity(quantity),
     };
 
+    if (String(transactiontype).toUpperCase() === "SELL") {
+      orderParams = await prepareSell(smartApi, orderParams);
+    }
     const response = await smartApi.placeOrder(orderParams);
     if (isAngelOrderRejected(response)) {
       return sendAngelOrderFailure(res, response);
@@ -109,6 +114,8 @@ exports.placeOrder = async (req, res) => {
       exchange: orderParams.exchange,
       transactiontype: orderParams.transactiontype,
       orderid: getAngelOrderId(response),
+      ordertag: "Traderobot",
+      order_source: "Traderobot",
       producttype: orderParams.producttype,
       variety: orderParams.variety,
       duration: orderParams.duration,
@@ -241,13 +248,14 @@ exports.sellMarket = async (req, res) => {
       return;
     }
 
-    const sellParams = {
+    let sellParams = {
       tradingsymbol,
       symboltoken,
+      ordertag: "Traderobot",
       transactiontype: "SELL", // 🔹 Always SELL
       exchange,
       ordertype: "MARKET", // 🔹 Market Order
-      producttype: producttype || "NRML",
+      producttype,
       variety: variety || "NORMAL",
       duration: duration || "DAY",
       price: 0, // Market order ignores price
@@ -256,6 +264,7 @@ exports.sellMarket = async (req, res) => {
 
     console.log("🔻 Selling at market:", sellParams);
 
+    sellParams = await prepareSell(smartApi, sellParams);
     const response = await smartApi.placeOrder(sellParams);
     if (isAngelOrderRejected(response)) {
       return sendAngelOrderFailure(res, response, "Sell market order failed");
@@ -279,10 +288,14 @@ exports.getAllOrders = async (req, res) => {
 
     const response = await smartApi.getOrderBook();
 
-    return sendSuccess(res, {
-      count: response?.data?.length || 0,
-      data: response?.data || [],
-    });
+    const localOrders = getTrades().flatMap(trade => [trade, ...(Array.isArray(trade.currentOrder) ? trade.currentOrder : [])]);
+    const orders = (response?.data || []).map(order => ({
+      ...order,
+      order_source: order.ordertag === "Traderobot" || localOrders.some(local =>
+        String(local.orderid) === String(order.orderid) && local.order_source === "Traderobot")
+        ? "Traderobot" : "angelone",
+    }));
+    return sendSuccess(res, { count: orders.length, data: orders });
   } catch (err) {
     return sendError(res, err, "Failed to fetch orders:");
   }

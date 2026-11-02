@@ -22,7 +22,7 @@ function reconcileOrders() {
         .filter((order) => order?.transactiontype === "SELL" &&
           !["complete", "cancelled", "rejected"].includes(order.status));
       const ids = new Set([
-        ...(pendingEntry && trade.orderid ? [String(trade.orderid)] : []),
+        ...((pendingEntry || (trade.trade_status === "running" && trade.order_source === "angelone" && !["submitted", "verify_required"].includes(trade.external_buy_guard))) && trade.orderid ? [String(trade.orderid)] : []),
         ...exits.map((order) => String(order.orderid)),
       ]);
       for (const order of orders) {

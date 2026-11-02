@@ -28,11 +28,18 @@ function addTrade(order = {}) {
   const existing = order.orderid && trades.find(
     trade => String(trade.orderid) === String(order.orderid)
   );
-  if (existing) return existing;
+  if (existing) {
+    if (order.order_source === "Traderobot" || order.ordertag === "Traderobot") {
+      updateTrade(existing.orderid, { ordertag: "Traderobot", order_source: "Traderobot" });
+    }
+    return existing;
+  }
 
   // ✅ Common structure for every trade/order
   const tradeData = {
     tradingsymbol,
+    ordertag: order.ordertag || "",
+    order_source: order.order_source === "Traderobot" || order.ordertag === "Traderobot" ? "Traderobot" : "angelone",
     symboltoken: token,
     exchange: order.exchange || "NSE",
     orderid: order.orderid || null,
@@ -82,6 +89,8 @@ function addTrade(order = {}) {
         {
           orderid: order.orderid,
           transactiontype: "SELL",
+          ordertag: order.ordertag || "",
+          order_source: order.order_source === "Traderobot" || order.ordertag === "Traderobot" ? "Traderobot" : "angelone",
           price: order.sell_price || order.price || 0,
           quantity: order.quantity || 1,
         },

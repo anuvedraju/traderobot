@@ -13,6 +13,7 @@ function load(file, mocks) {
   const trade = { symboltoken: '123', trade_status: 'running', currentOrder: [{ orderid: 'exit1', status: 'open' }] };
   let update;
   const manager = load('src/tradeManager.js', {
+    './services/externalBuyGuard': { async exitExternalBuy() {} },
     './services/angelFeed': { feedEmitter },
     './services/searchCooldown': { startSearchCooldown() {} },
     './data/trades': { getTrades: () => [trade], getActiveTrades: () => [trade], updateTrade: (_, data) => { update = data; } },

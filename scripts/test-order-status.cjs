@@ -30,7 +30,9 @@ function load(file, mocks) {
   assert.equal(store.getTrades()[0].trade_status, 'pending', 'order ID must select the right trade');
 
   const closes = [];
+  const guardedBuys = [];
   const manager = load('src/tradeManager.js', {
+    './services/externalBuyGuard': { async exitExternalBuy(trade) { guardedBuys.push(trade.orderid); } },
     './services/angelFeed': { feedEmitter }, './data/trades': store,
     './functions': { closeTrade(token) { closes.push(token); } },
     './services/searchCooldown': { startSearchCooldown() {} },
@@ -57,6 +59,7 @@ function load(file, mocks) {
   feedEmitter.emit('orderUpdate', external);
   const imported = store.getTrades().find(trade => trade.orderid === 'angel-app');
   assert.equal(imported.trade_status, 'open');
+  assert.equal(imported.order_source, 'angelone');
   assert.equal(imported.stop_loss, 2000);
   feedEmitter.emit('orderUpdate', { ...external, orderstatus: 'complete', averageprice: '501' });
   assert.equal(imported.trade_status, 'running');
@@ -72,7 +75,18 @@ function load(file, mocks) {
   const filled = store.getTrades().find(trade => trade.orderid === 'direct-fill');
   assert.equal(filled.trade_status, 'running');
   assert.equal(filled.stop_loss, 2000);
+  feedEmitter.emit('orderUpdate', { ...external, orderid: 'tagged-buy', symboltoken: '789', ordertag: 'Traderobot', status: 'complete' });
+  const tagged = store.getTrades().find(trade => trade.orderid === 'tagged-buy');
+  assert.equal(tagged.order_source, 'Traderobot');
+  feedEmitter.emit('orderUpdate', { ...external, orderid: 'race-buy', symboltoken: '790', status: 'complete' });
+  store.addTrade({ ...external, orderid: 'race-buy', symboltoken: '790', order_source: 'Traderobot', ordertag: 'Traderobot' });
+  assert.equal(store.getTrades().find(trade => trade.orderid === 'race-buy').order_source, 'Traderobot');
+
+  const buyGuardsBeforeSell = guardedBuys.length;
   feedEmitter.emit('orderUpdate', { ...external, orderid: 'sell-only', transactiontype: 'SELL' });
+  assert.equal(guardedBuys.length, buyGuardsBeforeSell, 'SELL updates must never invoke external buy guard');
+  assert.ok(guardedBuys.includes('angel-app'), 'completed imported BUY must invoke guard');
+  assert.ok(!guardedBuys.includes('unrelated'), 'unfilled BUY must not invoke guard');
   assert.equal(store.getTrades().some(trade => trade.orderid === 'sell-only'), false);
   assert.equal(closes.length, 0, 'order updates must not place exits');
   feedEmitter.emit('tick', { token: '456', ltp: 30300 });

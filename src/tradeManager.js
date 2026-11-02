@@ -1,3 +1,4 @@
+const { exitExternalBuy } = require("./services/externalBuyGuard");
 // src/tradeManager.js
 const { feedEmitter } = require("./services/angelFeed");
 const {
@@ -241,7 +242,14 @@ function handleOrderUpdate(order) {
 
     console.log(`📦 Order update: ${symboltoken} → ${status}`);
 
+    const exitTrade = txnType === "SELL" && getTrades().find(trade =>
+      (Array.isArray(trade.currentOrder) ? trade.currentOrder : []).some(current =>
+        String(current.orderid) === String(order.orderid)));
     const updates = {};
+    if (txnType === "BUY" && order.ordertag === "Traderobot") {
+      updates.ordertag = "Traderobot";
+      updates.order_source = "Traderobot";
+    }
 
     if (status === "complete") {
       if (txnType === "BUY") {
@@ -255,7 +263,8 @@ function handleOrderUpdate(order) {
         updates.trade_status = "closed";
         // updates.stop_loss = 10;
         updates.sell_price = order.averageprice || 0;
-        setPnL(symboltoken, order.averageprice);
+        if (!exitTrade) setPnL(symboltoken, order.averageprice);
+        else updates.profit_loss = Number(((Number(order.averageprice) - Number(exitTrade.buy_price)) * Number(order.quantity)).toFixed(2));
       }
     } else if (["cancelled", "rejected"].includes(status)) {
       if (txnType === "SELL") {
@@ -289,6 +298,8 @@ function handleOrderUpdate(order) {
               {
                 orderid: order.orderid,
                 transactiontype: "SELL",
+                ordertag: order.ordertag || "",
+                order_source: order.ordertag === "Traderobot" ? "Traderobot" : "angelone",
                 price: order.price || 0,
                 quantity: order.quantity || 1,
                 status,
@@ -309,7 +320,12 @@ function handleOrderUpdate(order) {
     }
 
     if (Object.keys(updates).length) {
-      updateTrade(entryTrade?.orderid || symboltoken, updates);
+      updateTrade(entryTrade?.orderid || exitTrade?.orderid || symboltoken, updates);
+    }
+
+    if (txnType === "BUY" && status === "complete" && entryTrade) {
+      // This service only reverses broker-confirmed external BUY executions.
+      void exitExternalBuy(entryTrade);
     }
 
     if (updates.trade_status)

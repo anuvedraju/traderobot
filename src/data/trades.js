@@ -136,7 +136,9 @@ function updateTrade(identifier, updates = {}) {
     [...trades].reverse().find((t) => t.symboltoken === id);
   if (!trade) return console.warn(`⚠️ Trade not found for ${id}`);
 
+  const wasClosed = isClosedTrade(trade);
   Object.assign(trade, updates, { updatedAt: new Date() });
+  if (!wasClosed && isClosedTrade(trade)) trade.closed_at = new Date().toISOString();
   scheduleSave();
   emitTrade(trade);
 }
@@ -196,6 +198,8 @@ function updatePnL(symboltoken, ltp) {
   if (!tokenTrades.length) return;
 
   tokenTrades.forEach((t) => {
+    // Freeze closed history: ticks must not keep rewriting its timestamp or UI.
+    if (["closed", "cancelled", "canceled", "rejected"].includes(t.trade_status)) return;
     t.last_traded_price = ltp;
     if (t.trade_status === "running") {
       t.profit_loss = Number(((ltp - t.buy_price) * t.quantity).toFixed(2));

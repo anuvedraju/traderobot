@@ -24,11 +24,15 @@ function load(file, mocks) {
   assert.equal(update.currentOrder[0].status, 'cancelled');
   assert.equal(update.trade_status, undefined, 'cancelled exit must preserve running position');
   const emitted = [];
-  class Server extends EventEmitter { emit(event, payload) { emitted.push([event, payload]); return true; } }
+  const liveTrades = [];
+  const subscriptions = [];
+  class Server extends EventEmitter {
+    sockets = { adapter: { rooms: new Map() } };
+    emit(event, payload) { emitted.push([event, payload]); return true; } }
   const { initSocketServer } = load('src/services/socketServer.js', {
     'socket.io': { Server },
-    '../services/angelFeed': { feedEmitter: new EventEmitter() },
-    '../data/trades': { tradeEmitter },
+    '../services/angelFeed': { feedEmitter: new EventEmitter(), subscribeTokens(token) { subscriptions.push(["subscribe", token]); }, unsubscribeTokens(token) { subscriptions.push(["unsubscribe", token]); } },
+    '../data/trades': { tradeEmitter, getTrades: () => liveTrades },
     '../functions': {},
   });
   initSocketServer({});
@@ -37,10 +41,25 @@ function load(file, mocks) {
   await new Promise(resolve => setTimeout(resolve, 120));
   assert.equal(emitted.length, 1);
   assert.equal(emitted[0][1].trade_status, 'cancelled');
-  tradeEmitter.emit('tradeUpdated', trade);
+  tradeEmitter.emit('tradeUpdated', { ...trade, trade_status: 'closed' });
   tradeEmitter.emit('tradeDeleted', { symboltoken: '123' });
   await new Promise(resolve => setTimeout(resolve, 120));
   assert.equal(emitted.length, 2);
   assert.equal(emitted[1][0], 'tradeDeleted');
+  tradeEmitter.emit('tradeUpdated', { ...trade, orderid: 'entryA', quantity: 65 });
+  tradeEmitter.emit('tradeUpdated', { ...trade, orderid: 'entryB', quantity: 130 });
+  await new Promise(resolve => setTimeout(resolve, 120));
+  const separate = emitted.slice(-2).map(([, payload]) => payload);
+  assert.deepEqual(separate.map(item => item.orderid).sort(), ['entryA', 'entryB']);
+  assert.equal(separate.find(item => item.orderid === 'entryA').quantity, 65);
+  liveTrades.push({ symboltoken: '123', trade_status: 'running' });
+  tradeEmitter.emit('tradeUpdated', { ...liveTrades[0], orderid: 'live' });
+  assert.deepEqual(subscriptions.at(-1), ['subscribe', '123']);
+  const before = subscriptions.length;
+  tradeEmitter.emit('tradeUpdated', { symboltoken: '123', orderid: 'history', trade_status: 'closed' });
+  assert.equal(subscriptions.length, before, 'closed history must preserve another live trade subscription');
+  liveTrades[0].trade_status = 'cancelled';
+  tradeEmitter.emit('tradeUpdated', liveTrades[0]);
+  assert.deepEqual(subscriptions.at(-1), ['unsubscribe', '123']);
   console.log('PASS: exit cancellation persistence, final-event delivery, delete prevents resurrection');
 })().catch(error => { console.error(error); process.exitCode = 1; });

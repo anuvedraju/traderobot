@@ -53,6 +53,11 @@ function load(file, mocks) {
   store.updateTrade('entry1', { trade_status: 'closed' });
   await reconciliation.reconcileOrders();
   assert.equal(store.getTrades()[0].trade_status, 'closed', 'old completed entries must not reopen closed positions');
+  const closedTimestamp = store.getTrades()[0].updatedAt;
+  const closedLtp = store.getTrades()[0].last_traded_price;
+  store.updatePnL('123', 150);
+  assert.equal(store.getTrades()[0].updatedAt, closedTimestamp);
+  assert.equal(store.getTrades()[0].last_traded_price, closedLtp, 'closed history must not change on live ticks');
   feedEmitter.emit('orderUpdate', { orderid: 'unrelated', symboltoken: '123', transactiontype: 'BUY', status: 'pending' });
   assert.equal(store.getTrades()[0].trade_status, 'closed');
   const external = { orderid: 'angel-app', symboltoken: '456', tradingsymbol: 'EXTERNAL', exchange: 'NFO', transactiontype: 'buy', status: ' OPEN ', quantity: '10', price: '500' };

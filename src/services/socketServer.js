@@ -43,7 +43,8 @@ function initSocketServer(httpServer) {
   const shouldUnsubscribeToken = (tokenStr) => {
     const clientsInRoom = io.sockets.adapter.rooms.get(tokenStr);
     const isTradeExisting = getTrades().some(
-      (t) => t.symboltoken?.toString() === tokenStr
+      (t) => normalizeToken(t.symboltoken) === tokenStr &&
+        !["closed", "cancelled", "canceled", "rejected"].includes(String(t.trade_status || t.status || t.orderstatus).toLowerCase())
     );
 
     return {
@@ -240,7 +241,19 @@ function initSocketServer(httpServer) {
   const timers = new Map();
   tradeEmitter.on("tradeUpdated", (trade) => {
     if (!trade?.symboltoken) return;
-    const token = String(trade.symboltoken);
+    const symboltoken = normalizeToken(trade.symboltoken);
+    const exchange = activeSubscriptions.get(symboltoken) || normalizeExchange(trade.exchange);
+    const { shouldUnsubscribe, isTradeExisting } = shouldUnsubscribeToken(symboltoken);
+    if (shouldUnsubscribe) {
+      // Trade subscriptions can originate in addTrade, outside this map.
+      unsubscribeTokens(symboltoken, exchange);
+      activeSubscriptions.delete(symboltoken);
+    } else if (isTradeExisting && !activeSubscriptions.has(symboltoken)) {
+      subscribeTokens(symboltoken, exchange);
+      activeSubscriptions.set(symboltoken, exchange);
+    }
+    const token = String(trade.orderid || trade.id || trade.symboltoken);
+    // Coalesce per entry: multiple trades can share the same symbol token.
     // Trailing coalescing preserves the final update, including cancellation.
     pendingTrades.set(token, { ...pendingTrades.get(token), ...trade });
     if (!timers.has(token)) timers.set(token, setTimeout(() => {
@@ -254,9 +267,12 @@ function initSocketServer(httpServer) {
   tradeEmitter.on("tradeDeleted", ({ symboltoken }) => {
     if (!symboltoken) return;
     const token = String(symboltoken);
-    clearTimeout(timers.get(token));
-    timers.delete(token);
-    pendingTrades.delete(token);
+    for (const [key, trade] of pendingTrades) {
+      if (String(trade.symboltoken) !== token || trade.trade_status !== "closed") continue;
+      clearTimeout(timers.get(key));
+      timers.delete(key);
+      pendingTrades.delete(key);
+    }
     io.emit("tradeDeleted", { symboltoken: token });
   });
 

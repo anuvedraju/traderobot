@@ -16,6 +16,7 @@ let listenersAttached = false;
 let heartbeatTimer = null;
 let orderReconnectTimer = null;
 const pendingMarketSubscriptions = new Map();
+const desiredMarketSubscriptions = new Map();
 
 const exchangeMap = {
   NSE: 1,
@@ -99,6 +100,7 @@ async function initAngelFeed({ jwtToken, feedToken }) {
 
   try {
     // --- Market Feed (LTP / Tick) ---
+    listenersAttached = false;
     marketWS = new WebSocketV2({
       jwttoken: jwtToken,
       apikey: apiKey,
@@ -106,13 +108,20 @@ async function initAngelFeed({ jwtToken, feedToken }) {
       feedtype: feedToken,
     });
 
+    // This SDK exposes tick callbacks only; its close callback is not forwarded.
+    // Enable its native reconnect path so a silent transport close recovers.
+    marketWS.reconnection("simple", 10000);
     await marketWS.connect();
     isConnected = isFeedConnected = isSessionActive = true;
 
     console.log("📡 Market WebSocket connected ✅");
     emitFeedStatus();
     attachMarketListeners(jwtToken, feedToken);
-    flushPendingSubscriptions();
+    // A replacement connection has no broker subscriptions. Replay desired state.
+    pendingMarketSubscriptions.clear();
+    for (const { tokens, exchangeType, mode } of desiredMarketSubscriptions.values()) {
+      subscribeTokens([...tokens], exchangeType, mode);
+    }
 
     // --- Order Feed (Status Updates) ---
     initOrderStatusFeed(jwtToken);
@@ -244,6 +253,12 @@ function subscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
   const normalizedTokens = normalizeTokens(tokens);
   if (!normalizedTokens.length) return false;
 
+  const key = getSubscriptionKey(exchangeType, mode);
+  if (!desiredMarketSubscriptions.has(key)) {
+    desiredMarketSubscriptions.set(key, { exchangeType, mode, tokens: new Set() });
+  }
+  normalizedTokens.forEach(token => desiredMarketSubscriptions.get(key).tokens.add(token));
+
   if (!marketWS || !isConnected) {
     queuePendingSubscription(normalizedTokens, exchangeType, mode);
     console.warn(
@@ -272,11 +287,16 @@ function subscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
 }
 
 function unsubscribeTokens(tokens, exchangeType = "NFO", mode = 1) {
-  if (!marketWS || !isConnected)
-    return console.warn("⚠️ Market feed not ready yet.");
-
   const normalizedTokens = normalizeTokens(tokens);
   if (!normalizedTokens.length) return;
+  const key = getSubscriptionKey(exchangeType, mode);
+  for (const subscriptions of [desiredMarketSubscriptions, pendingMarketSubscriptions]) {
+    const entry = subscriptions.get(key);
+    if (!entry) continue;
+    normalizedTokens.forEach(token => entry.tokens.delete(token));
+    if (!entry.tokens.size) subscriptions.delete(key);
+  }
+  if (!marketWS || !isConnected) return;
 
   const unsubReq = {
     correlationID: `unsub_${Date.now()}`,
